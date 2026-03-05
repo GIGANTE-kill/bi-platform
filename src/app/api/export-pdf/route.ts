@@ -12,8 +12,12 @@ export async function POST(req: Request) {
         // Launch a headless browser instance
         const browser = await puppeteer.launch({
             headless: true,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // Use system chromium path (needed for Docker)
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ],
         });
 
         const page = await browser.newPage();
