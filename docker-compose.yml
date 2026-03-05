@@ -11,6 +11,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - Servidores
 
   app:
     build:
@@ -28,6 +30,12 @@ services:
       DB_CONNECT_STRING: ${DB_CONNECT_STRING}
     depends_on:
       - db
+    networks:
+      - Servidores
 
 volumes:
   postgres_data:
+
+networks:
+  Servidores:
+    external: true
