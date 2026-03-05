@@ -1,0 +1,114 @@
+[
+  {
+    "COLUMN_NAME": "BONIFICACAO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "BONIFICACAO_DEVOLVIDA",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CODCLI",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CODFILIAL",
+    "DATA_TYPE": "VARCHAR2"
+  },
+  {
+    "COLUMN_NAME": "CODFILIALPAI",
+    "DATA_TYPE": "VARCHAR2"
+  },
+  {
+    "COLUMN_NAME": "CODGERENTE",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CODPROD",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CODSUPERVISOR",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CODUSUR",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "COFINS",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "COMISSAO_BRUTA",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "COMISSAO_LIQUIDA",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CUSTO_BRUTO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CUSTO_CONTABIL",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CUSTO_DEVOLVIDO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "CUSTO_LIQUIDO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "DATA",
+    "DATA_TYPE": "DATE"
+  },
+  {
+    "COLUMN_NAME": "DEVOLUCAO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "DTATUALIZACAO",
+    "DATA_TYPE": "DATE"
+  },
+  {
+    "COLUMN_NAME": "FATURAMENTO_BRUTO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "FATURAMENTO_LIQUIDO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "ICMS",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "LUCRO",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "PESOBRUTO",
+    "DATA_TYPE": "FLOAT"
+  },
+  {
+    "COLUMN_NAME": "PIS",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "QTD",
+    "DATA_TYPE": "NUMBER"
+  },
+  {
+    "COLUMN_NAME": "VLAPLVERBA",
+    "DATA_TYPE": "FLOAT"
+  },
+  {
+    "COLUMN_NAME": "VLCMVANTESAPLVERBA",
+    "DATA_TYPE": "FLOAT"
+  }
+]

@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["adapterApi"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ReportTemplate {
+  id              String      @id @default(uuid())
+  nome            String
+  dataset         String
+  filtros         String? // JSON string containing saved filters
+  selectedColumns String
+  emails          String
+  frequency       String // e.g. "DAILY", "WEEKLY", "MONTHLY"
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  logs            ReportLog[]
+}
+
+model ReportLog {
+  id           String          @id @default(uuid())
+  templateId   String?
+  template     ReportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  recipient    String
+  subject      String
+  status       String // "SUCCESS", "FAILURE"
+  sentAt       DateTime        @default(now())
+  errorMessage String?
+}
