@@ -2,6 +2,9 @@
 FROM node:20 AS deps
 WORKDIR /app
 
+# Instalar git caso alguma dependência precise (ex: pacotes do github ou metadados de build)
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Em imagens completas já temos build-essential, mas garantimos o necessário
 COPY package.json package-lock.json ./
 
