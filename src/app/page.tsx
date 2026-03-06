@@ -1,283 +1,126 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  Bar,
-  BarChart,
-  Area,
-  AreaChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
-import { fetchDashboardOverview } from "@/lib/actions/db";
-import { ExportToolbar } from "@/components/ExportToolbar";
-import { Loader2 } from "lucide-react";
+  LayoutDashboard,
+  FileBarChart,
+  CalendarClock,
+  LogOut,
+  User as UserIcon,
+  ChevronRight,
+  Search
+} from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const salesChartConfig = {
-  RECEITA: { label: "Receita (Vendas)", color: "var(--color-chart-1)" },
-  CUSTO_ENTRADA: { label: "Entradas (Compras)", color: "var(--color-chart-5)" },
-} satisfies ChartConfig;
+export default function HomePage() {
+  const { data: session } = useSession();
 
-const supplierChartConfig = {
-  VALOR_COMPRADO: { label: "Volume de Compras", color: "var(--color-chart-3)" },
-} satisfies ChartConfig;
+  const stats = [
+    { label: "Relatórios Ativos", value: "12", icon: FileBarChart, color: "text-primary" },
+    { label: "Agendamentos", value: "8", icon: CalendarClock, color: "text-chart-2" },
+    { label: "Acessos Hoje", value: "24", icon: UserIcon, color: "text-sky-400" },
+  ];
 
-export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [supplierData, setSupplierData] = useState<any[]>([]);
-
-  // Indicadores
-  const [totalReceita, setTotalReceita] = useState(0);
-  const [totalCusto, setTotalCusto] = useState(0);
-
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      setError(null);
-
-      const CACHE_KEY = "dashboard_overview_data";
-
-      try {
-        const cached = sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          setMonthlyData(parsed.monthly || []);
-          setSupplierData(parsed.topFornecedores || []);
-          if (parsed.monthly) {
-            setTotalReceita(parsed.monthly.reduce((acc: number, cur: any) => acc + (cur.RECEITA || 0), 0));
-            setTotalCusto(parsed.monthly.reduce((acc: number, cur: any) => acc + (cur.CUSTO_ENTRADA || 0), 0));
-          }
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetchDashboardOverview();
-        if (response.success && response.data) {
-          setMonthlyData(response.data.monthly || []);
-          setSupplierData(response.data.topFornecedores || []);
-
-          if (response.data.monthly) {
-            const rc = response.data.monthly.reduce((acc: number, cur: any) => acc + (cur.RECEITA || 0), 0);
-            const ct = response.data.monthly.reduce((acc: number, cur: any) => acc + (cur.CUSTO_ENTRADA || 0), 0);
-            setTotalReceita(rc);
-            setTotalCusto(ct);
-          }
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify(response.data));
-        } else {
-          setError(response.error || "Erro desconhecido ao carregar Dashboard.");
-        }
-      } catch (err) {
-        setError("Erro na conexão com dados do dashboard.");
-      } finally {
-        setLoading(false);
-      }
+  const quickActions = [
+    {
+      title: "Construtor de Relatórios",
+      description: "Crie relatórios personalizados arrastando colunas.",
+      link: "/builder",
+      icon: LayoutDashboard
+    },
+    {
+      title: "Relatório Financeiro",
+      description: "Visualize o fluxo de caixa semanal por fornecedor.",
+      link: "/relatorio-financeiro",
+      icon: FileBarChart
     }
-    loadData();
-  }, []);
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
-
-  const formatShortCurrency = (val: number) => {
-    if (val >= 1000000) return `R$ ${(val / 1000000).toFixed(1)}M`;
-    if (val >= 1000) return `R$ ${(val / 1000).toFixed(1)}k`;
-    return `R$ ${val}`;
-  };
+  ];
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-
-      {/* Header e Ferramentas */}
+    <div className="flex flex-col gap-8 h-full">
+      {/* Header / Welcome Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-3">
-            Dashboard Executivo
+        <div className="space-y-1">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-2 whitespace-nowrap">
+            Bem-vindo, {session?.user?.name || "Usuário"}!
           </h1>
-          <p className="text-muted-foreground mt-2 font-medium">
-            Desempenho financeiro semestral consolidado do Oracle ERP
+          <p className="text-muted-foreground font-medium">
+            Plataforma de BI - Painel Administrativo de Gerência.
           </p>
         </div>
-        <ExportToolbar
-          elementIdToExport="dashboard-report"
-          fileName="Dashboard_Gerencial"
-          dataset="Dashboard"
-          availableColumns={[]}
-          selectedColumns={[]}
-        />
+
+        <div className="flex items-center gap-3 bg-card/40 p-1.5 rounded-xl border border-border/50 backdrop-blur-lg">
+          <div className="px-3 py-1.5 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sessão Ativa</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 gap-2 font-bold">
+            <LogOut className="h-4 w-4" />
+            Sair
+          </Button>
+        </div>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/50 text-red-500 rounded-md">
-          {error}
-        </div>
-      )}
-
-      <div id="dashboard-report" className="flex flex-col gap-6 bg-background rounded-lg p-2 print:bg-white print:text-black">
-
-        {/* Indicadores */}
-        <div className="grid gap-6 md:grid-cols-4">
-          <Card className="bg-linear-to-br from-background/90 to-muted/30 backdrop-blur-md border border-border/50 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300">
-            <CardHeader className="pb-2">
-              <CardDescription>Faturamento 6 Meses</CardDescription>
-              <CardTitle className="text-2xl text-foreground">
-                {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : formatCurrency(totalReceita)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">+ Crescimento ativo</div>
+      {/* Quick Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {stats.map((stat, i) => (
+          <Card key={i} className="bg-card/40 border-border/50 backdrop-blur-md hover:border-primary/30 transition-all duration-300">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                <p className="text-3xl font-black tabular-nums">{stat.value}</p>
+              </div>
+              <div className={`p-4 rounded-2xl bg-muted/20 ${stat.color}`}>
+                <stat.icon className="h-6 w-6" />
+              </div>
             </CardContent>
           </Card>
+        ))}
+      </div>
 
-          <Card className="bg-linear-to-br from-background/90 to-muted/30 backdrop-blur-md border border-border/50 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300">
-            <CardHeader className="pb-2">
-              <CardDescription>Custo Entrada 6 Meses</CardDescription>
-              <CardTitle className="text-2xl text-emerald-500">
-                {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : formatCurrency(totalCusto)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Volume gasto com compras</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-linear-to-br from-background/90 to-muted/30 backdrop-blur-md border border-border/50 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300">
-            <CardHeader className="pb-2">
-              <CardDescription>Top Fornecedores</CardDescription>
-              <CardTitle className="text-2xl text-foreground">
-                {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : supplierData.length}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Volume significativo no mês</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-linear-to-br from-background/90 to-muted/30 backdrop-blur-md border border-border/50 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300">
-            <CardHeader className="pb-2">
-              <CardDescription>Margem Bruta (Est.)</CardDescription>
-              <CardTitle className="text-2xl text-primary">
-                {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : `${totalReceita > 0 ? (((totalReceita - totalCusto) / totalReceita) * 100).toFixed(1) : 0}%`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-muted-foreground">Cálculo simplificado</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráficos */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="bg-linear-to-br from-background to-muted/20 backdrop-blur-xl border border-border/50 shadow-lg hover:shadow-xl hover:shadow-primary/10 transition-all duration-500">
-            <CardHeader>
-              <CardTitle className="text-xl text-primary">Receita vs. Custos (6 Meses)</CardTitle>
-              <CardDescription>Fluxo histórico do balanço financeiro</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="h-[250px] flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+      {/* Main Content Area */}
+      <div className="grid gap-6 lg:grid-cols-2 flex-1 min-h-0">
+        <Card className="bg-linear-to-br from-card/60 to-background/40 border-border/50 flex flex-col h-fit">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              Acesso Rápido
+            </CardTitle>
+            <CardDescription>Principais ferramentas para análise de dados.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-6">
+            {quickActions.map((action, i) => (
+              <Link key={i} href={action.link}>
+                <div className="group p-4 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-lg bg-muted/30 group-hover:bg-primary/20 transition-colors">
+                      <action.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-foreground">{action.title}</h4>
+                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary transition-colors" />
                 </div>
-              ) : (
-                <ChartContainer config={salesChartConfig}>
-                  <AreaChart data={monthlyData} margin={{ left: -20, right: 12 }}>
-                    <CartesianGrid vertical={false} strokeOpacity={0.1} />
-                    <XAxis
-                      dataKey="MES_ANO"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickCount={6}
-                      tickFormatter={formatShortCurrency}
-                    />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                    <Area
-                      dataKey="RECEITA"
-                      type="monotone"
-                      fill="var(--color-RECEITA)"
-                      fillOpacity={0.2}
-                      stroke="var(--color-RECEITA)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      dataKey="CUSTO_ENTRADA"
-                      type="monotone"
-                      fill="var(--color-CUSTO_ENTRADA)"
-                      fillOpacity={0.2}
-                      stroke="var(--color-CUSTO_ENTRADA)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
 
-          <Card className="bg-linear-to-br from-background to-muted/20 backdrop-blur-xl border border-border/50 shadow-lg hover:shadow-xl hover:shadow-primary/10 transition-all duration-500">
-            <CardHeader>
-              <CardTitle className="text-xl text-primary">Top 5 Fornecedores</CardTitle>
-              <CardDescription>Por Volume de Compra (Mês Corrente)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="h-[250px] flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
-                </div>
-              ) : supplierData.length === 0 ? (
-                <div className="h-[250px] flex items-center justify-center text-muted-foreground">Sem dados suficientes no mês...</div>
-              ) : (
-                <ChartContainer config={supplierChartConfig}>
-                  <BarChart data={supplierData} margin={{ left: -20, right: 12 }}>
-                    <CartesianGrid vertical={false} strokeOpacity={0.1} />
-                    <XAxis
-                      dataKey="FORNECEDOR"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickFormatter={(val) => val.length > 10 ? val.substring(0, 10) + '...' : val}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickCount={5}
-                      tickFormatter={formatShortCurrency}
-                    />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="VALOR_COMPRADO"
-                      fill="var(--color-VALOR_COMPRADO)"
-                      radius={[4, 4, 0, 0]}
-                      barSize={40}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="bg-card/20 border-dashed border-2 border-border/40 flex items-center justify-center p-8 text-center min-h-[300px]">
+          <div className="space-y-4">
+            <div className="w-16 h-16 rounded-full bg-muted/10 mx-auto flex items-center justify-center">
+              <LayoutDashboard className="h-8 w-8 text-muted-foreground/20" />
+            </div>
+            <h4 className="text-lg font-bold text-muted-foreground/40">Seu Dashboard Principal</h4>
+            <p className="text-sm text-muted-foreground/30 max-w-[280px]">
+              Implemente gráficos e métricas de desempenho aqui para ter uma visão geral do negócio.
+            </p>
+          </div>
+        </Card>
       </div>
     </div>
   );

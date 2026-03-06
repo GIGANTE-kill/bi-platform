@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { sendReportEmail } from "@/lib/actions/export";
 import { ScheduleModal } from "./builder/schedule-modal";
+import * as XLSX from 'xlsx';
 
 interface ExportToolbarProps {
     elementIdToExport: string; // ID of the wrapper div to capture
@@ -26,6 +27,8 @@ interface ExportToolbarProps {
     filtros?: any;
     selectedColumns?: string[];
     availableColumns?: { id: string; label: string }[];
+    data?: any[]; // The actual data to export
+    availableFornecedores?: string[]; // Optional list of suppliers for scheduling
 }
 
 export function ExportToolbar({
@@ -34,7 +37,9 @@ export function ExportToolbar({
     dataset,
     filtros,
     selectedColumns,
-    availableColumns = []
+    availableColumns = [],
+    data = [],
+    availableFornecedores = []
 }: ExportToolbarProps) {
     const [isExporting, setIsExporting] = useState(false);
     const [emailOpen, setEmailOpen] = useState(false);
@@ -45,100 +50,50 @@ export function ExportToolbar({
     const [emailSubject, setEmailSubject] = useState(`Relatório: ${fileName}`);
     const [emailBody, setEmailBody] = useState("Olá,\n\nSegue em anexo o relatório solicitado.\n\nAtenciosamente,");
 
-    const handleExportPDF = async () => {
+    const handleExportExcel = async () => {
         setIsExporting(true);
         try {
             const element = document.getElementById(elementIdToExport);
-            if (!element) {
-                toast.error("Área de exportação não encontrada na página.");
+            const workbook = XLSX.utils.book_new();
+            let worksheet;
+
+            // Tentativa 1: Exportar via DOM (Captura exatamente o que o usuário está vendo, incluindo headers complexos e cores)
+            if (element) {
+                const table = element.querySelector('table');
+                if (table) {
+                    worksheet = XLSX.utils.table_to_sheet(table);
+                }
+            }
+
+            // Tentativa 2: Fallback via Prop data (Se não houver tabela no DOM ou se for uma lista invisível)
+            if (!worksheet && data && data.length > 0 && availableColumns.length > 0) {
+                const activeCols = availableColumns.filter(c => !selectedColumns || selectedColumns.includes(c.id));
+                const formattedData = data.map(item => {
+                    const row: Record<string, any> = {};
+                    activeCols.forEach(col => {
+                        row[col.label] = item[col.id] ?? "";
+                    });
+                    return row;
+                });
+                worksheet = XLSX.utils.json_to_sheet(formattedData);
+            }
+
+            if (!worksheet) {
+                toast.error("Nenhum dado disponível para exportar no momento. Aguarde o carregamento ou verifique os filtros.");
                 setIsExporting(false);
                 return;
             }
 
-            // Extract the HTML content we want to render
-            const htmlContent = element.outerHTML;
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
 
-            // Extract current page styles to pass along
-            const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-                .map(s => s.outerHTML)
-                .join('\n');
+            // Gera e baixa o arquivo
+            const fileNameWithExt = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, fileNameWithExt);
 
-            // Build a full HTML document preserving styles and Tailwind
-            const fullHtml = `
-                <!DOCTYPE html>
-                <html class="dark">
-                <head>
-                    <meta charset="utf-8">
-                    <base href="${window.location.origin}">
-                    <style>
-                        /* Forçamos fundo escuro e textos legíveis similar à tela */
-                        body { background-color: #09090b !important; color: #fafafa !important; }
-                        
-                        /* Ajustes vitais para impressão e PDF */
-                        @media print {
-                            body, html { overflow: visible !important; height: auto !important; min-height: auto !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                            * { box-shadow: none !important; }
-                            
-                            /* Evita que contêineres Flex globais empurrem a tabela para a segunda página */
-                            body > div, .min-h-screen, .h-screen, .h-full { height: auto !important; min-height: auto !important; display: block !important; padding: 0 !important; margin: 0 !important; }
-                            
-                            /* Remove espaçamentos extras de tela no PDF (gaps, paddings) */
-                            .p-6, .gap-6, .py-6, .my-6, .mt-6, .mb-6 { padding: 0 !important; margin: 0 !important; gap: 4px !important; }
-                            
-                            /* Compactar os cartões de resumo para caberem no topo sem pular página */
-                            .grid { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; margin-bottom: 10px !important; page-break-inside: avoid !important; }
-                            .grid > div { flex: 1 1 auto !important; min-width: 0 !important; padding: 10px !important; }
-                            .grid h3, .grid p { margin: 0 !important; }
-                            
-                            /* Ajustes na Tabela */
-                            table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; max-width: none !important; }
-                            tr { page-break-inside: avoid !important; page-break-after: auto !important; }
-                            td, th { page-break-inside: avoid !important; padding: 4px 2px !important; }
-                            thead { display: table-header-group !important; }
-                            tfoot { display: table-footer-group !important; }
-                            
-                            /* Remove espaços em branco indesejados no fim/inicio */
-                            .overflow-x-auto, .overflow-y-auto, .overflow-hidden { overflow: visible !important; width: auto !important; }
-                            
-                            /* Força o conteúdo a começar imediatamente no topo */
-                            #finance-report-data { margin-top: 0 !important; padding-top: 0 !important; }
-                        }
-                    </style>
-                    ${styles}
-                </head>
-                <body class="bg-background text-foreground">
-                    <div style="width: 100%; display: block; padding: 0;">
-                        ${htmlContent}
-                    </div>
-                </body>
-                </html>
-            `;
-
-            const response = await fetch('/api/export-pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html: fullHtml, fileName })
-            });
-
-            if (!response.ok) {
-                throw new Error("Falha ao gerar o PDF no servidor");
-            }
-
-            // Trigger file download
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-
-            toast.success("Relatório gerado e baixado com sucesso!");
+            toast.success("Relatório Excel gerado com sucesso!");
         } catch (err) {
             console.error(err);
-            toast.error("Erro ao gerar PDF: " + (err instanceof Error ? err.message : String(err)));
+            toast.error("Erro ao gerar Excel: " + (err instanceof Error ? err.message : String(err)));
         } finally {
             setIsExporting(false);
         }
@@ -151,104 +106,54 @@ export function ExportToolbar({
         }
 
         setIsExporting(true);
-        const element = document.getElementById(elementIdToExport);
-        if (!element) {
-            toast.error("Erro ao localizar o relatório para anexo.");
-            setIsExporting(false);
-            return;
-        }
-
         try {
-            const htmlContent = element.outerHTML;
-            const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-                .map(s => s.outerHTML)
-                .join('\n');
+            const element = document.getElementById(elementIdToExport);
+            const workbook = XLSX.utils.book_new();
+            let worksheet;
 
-            const fullHtml = `
-                <!DOCTYPE html>
-                <html class="dark">
-                <head>
-                    <meta charset="utf-8">
-                    <base href="${window.location.origin}">
-                    <style>
-                        /* Forçamos fundo escuro e textos legíveis similar à tela */
-                        body { background-color: #09090b !important; color: #fafafa !important; }
-                        
-                        /* Ajustes vitais para impressão e PDF */
-                        @media print {
-                            body, html { overflow: visible !important; height: auto !important; min-height: auto !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                            * { box-shadow: none !important; }
-                            
-                            /* Evita que contêineres Flex globais empurrem a tabela para a segunda página */
-                            body > div, .min-h-screen, .h-screen, .h-full { height: auto !important; min-height: auto !important; display: block !important; padding: 0 !important; margin: 0 !important; }
-                            
-                            /* Remove espaçamentos extras de tela no PDF (gaps, paddings) */
-                            .p-6, .gap-6, .py-6, .my-6, .mt-6, .mb-6 { padding: 0 !important; margin: 0 !important; gap: 4px !important; }
-                            
-                            /* Compactar os cartões de resumo para caberem no topo sem pular página */
-                            .grid { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; margin-bottom: 10px !important; page-break-inside: avoid !important; }
-                            .grid > div { flex: 1 1 auto !important; min-width: 0 !important; padding: 10px !important; }
-                            .grid h3, .grid p { margin: 0 !important; }
-                            
-                            /* Ajustes na Tabela */
-                            table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; max-width: none !important; }
-                            tr { page-break-inside: avoid !important; page-break-after: auto !important; }
-                            td, th { page-break-inside: avoid !important; padding: 4px 2px !important; }
-                            thead { display: table-header-group !important; }
-                            tfoot { display: table-footer-group !important; }
-                            
-                            /* Remove espaços em branco indesejados no fim/inicio */
-                            .overflow-x-auto, .overflow-y-auto, .overflow-hidden { overflow: visible !important; width: auto !important; }
-                            
-                            /* Força o conteúdo a começar imediatamente no topo */
-                            #finance-report-data { margin-top: 0 !important; padding-top: 0 !important; }
-                        }
-                    </style>
-                    ${styles}
-                </head>
-                <body class="bg-background text-foreground">
-                    <div style="width: 100%; display: block; padding: 0;">
-                        ${htmlContent}
-                    </div>
-                </body>
-                </html>
-            `;
-
-            // Step 1: Generate PDF Buffer via our API
-            const pdfResponse = await fetch('/api/export-pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html: fullHtml, fileName })
-            });
-
-            if (!pdfResponse.ok) {
-                throw new Error("Falha ao preparar o arquivo PDF para o e-mail");
+            // Mesma lógica de prioridade: DOM Table -> Data Prop
+            if (element) {
+                const table = element.querySelector('table');
+                if (table) {
+                    worksheet = XLSX.utils.table_to_sheet(table);
+                }
             }
 
-            // Converter para Base64 para anexar no email
-            const blob = await pdfResponse.blob();
-            const pdfBase64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(blob);
-                reader.onloadend = () => {
-                    resolve(reader.result as string); // Returns "data:application/pdf;base64,....."
-                };
-                reader.onerror = reject;
-            });
+            if (!worksheet && data && data.length > 0 && availableColumns.length > 0) {
+                const activeCols = availableColumns.filter(c => !selectedColumns || selectedColumns.includes(c.id));
+                const formattedData = data.map(item => {
+                    const row: Record<string, any> = {};
+                    activeCols.forEach(col => {
+                        row[col.label] = item[col.id] ?? "";
+                    });
+                    return row;
+                });
+                worksheet = XLSX.utils.json_to_sheet(formattedData);
+            }
 
-            const fileNameWithExt = `${fileName}_${new Date().toISOString().split('T')[0]}.pdf`;
+            if (!worksheet) {
+                toast.error("Não foi possível gerar dados para o anexo.");
+                setIsExporting(false);
+                return;
+            }
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
+
+            // Gera o buffer em base64
+            const excelBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+            const fileNameWithExt = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
 
             const result = await sendReportEmail({
                 to: emailTo,
                 subject: emailSubject,
                 body: emailBody,
-                attachmentBase64: pdfBase64,
+                attachmentBase64: excelBase64,
                 fileName: fileNameWithExt
             });
 
             if (result.success) {
                 setEmailOpen(false);
-                toast.success(`E-mail enviado com sucesso para ${emailTo}!`);
+                toast.success(`E-mail com anexo Excel enviado para ${emailTo}!`);
             } else {
                 toast.error(`Falha ao enviar e-mail: ${result.error}`);
             }
@@ -261,31 +166,33 @@ export function ExportToolbar({
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-2 p-2 bg-card/40 border border-border/50 rounded-md backdrop-blur shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <Button
                 variant="default"
                 size="sm"
-                className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
-                onClick={handleExportPDF}
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white transition-all whitespace-nowrap"
+                onClick={handleExportExcel}
                 disabled={isExporting}
             >
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Salvar PDF
+                <span className="hidden xs:inline">Exportar Excel</span>
+                <span className="xs:hidden">Excel</span>
             </Button>
 
             {/* MODAL EMAIL */}
             <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 border-primary/30 hover:bg-primary/10">
+                    <Button variant="outline" size="sm" className="gap-2 border-primary/30 hover:bg-primary/10 whitespace-nowrap">
                         <Mail className="w-4 h-4 text-primary" />
-                        Enviar Agora
+                        <span className="hidden xs:inline">Enviar Agora</span>
+                        <span className="xs:hidden">Enviar</span>
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[500px] bg-card border-border/50 backdrop-blur-md">
                     <DialogHeader>
                         <DialogTitle>Enviar Relatório por E-mail</DialogTitle>
                         <DialogDescription>
-                            O PDF atual da página será anexado automaticamente a este e-mail.
+                            O arquivo Excel com os dados atuais será anexado automaticamente a este e-mail.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -332,11 +239,12 @@ export function ExportToolbar({
             <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-chart-1/30 hover:bg-chart-1/10 group"
+                className="gap-2 border-chart-1/30 hover:bg-chart-1/10 group whitespace-nowrap"
                 onClick={() => setScheduleOpen(true)}
             >
                 <CalendarClock className="w-4 h-4 text-chart-1 group-hover:animate-pulse" />
-                Agendar Envios
+                <span className="hidden xs:inline">Agendar Envios</span>
+                <span className="xs:hidden">Agendar</span>
             </Button>
 
             <ScheduleModal
@@ -347,6 +255,7 @@ export function ExportToolbar({
                 dataset={dataset}
                 filtros={filtros}
                 reportName={fileName}
+                availableFornecedores={availableFornecedores}
             />
         </div>
     );

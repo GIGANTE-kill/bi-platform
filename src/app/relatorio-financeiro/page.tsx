@@ -1,8 +1,8 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Filter, X } from "lucide-react";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
     Card,
     CardContent,
@@ -21,6 +21,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { fetchRelatorioFinanceiro } from "@/lib/actions/db";
 import { ExportToolbar } from "@/components/ExportToolbar";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function RelatorioFinanceiro() {
     const [financialData, setFinancialData] = useState<any[]>([]);
@@ -29,6 +35,8 @@ export default function RelatorioFinanceiro() {
 
     // Filtros de UI
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'w3_saldo', direction: 'desc' });
+    const [selectedFornecedores, setSelectedFornecedores] = useState<string[]>([]);
+    const [searchFornecedor, setSearchFornecedor] = useState("");
 
     // Filtros de Data. Default: Últimos 28 dias
     const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -118,6 +126,20 @@ export default function RelatorioFinanceiro() {
     // AGRUPAMENTO E TRANSFORMAÇÃO DE DADOS
     // ==========================================
 
+    const uniqueFornecedores = React.useMemo(() => {
+        const map = new Map<string, string>();
+        financialData.forEach(curr => {
+            const id = curr.CODFORNECPRINC || curr.CODFORNEC || "N/A";
+            const nome = curr.FORNECEDOR_PRINCIPAL || curr.FORNECEDOR || "FORNECEDOR PRINCIPAL N/I";
+            if (id !== "N/A") map.set(id, nome);
+
+            const idSub = curr.CODFORNEC || "N/A";
+            const nomeSub = curr.FORNECEDOR || "FORNECEDOR SEM NOME";
+            if (idSub !== "N/A") map.set(idSub, nomeSub);
+        });
+        return Array.from(map.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    }, [financialData]);
+
     const groupedData = React.useMemo(() => {
         const groups: Record<string, any> = {};
 
@@ -131,6 +153,12 @@ export default function RelatorioFinanceiro() {
             const subChave = `${fornecId}-${fornecNome}`;
 
             const itemDateStr = new Date(curr.DATA_EXATA).toISOString().split('T')[0];
+
+            if (selectedFornecedores.length > 0) {
+                if (!selectedFornecedores.includes(String(principalId)) && !selectedFornecedores.includes(String(fornecId))) {
+                    return;
+                }
+            }
 
             // Encontrar em qual semana o item cai
             const weekIndex = weeks.findIndex(w => itemDateStr >= w.start && itemDateStr <= w.end);
@@ -175,7 +203,7 @@ export default function RelatorioFinanceiro() {
         });
 
         return groups;
-    }, [financialData, weeks]);
+    }, [financialData, weeks, selectedFornecedores]);
 
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
@@ -264,43 +292,126 @@ export default function RelatorioFinanceiro() {
         return { entrada, saida, estoque, saldo: saida - entrada };
     }, [displayData]);
 
+    const exportDataFlat = React.useMemo(() => {
+        return displayData.map(item => {
+            const flat: any = {
+                codFornec: item.codFornec,
+                fornecedor: item.fornecedor,
+            };
+            item.weeks.forEach((w: any, idx: number) => {
+                flat[`w${idx}_entrada`] = w.entrada;
+                flat[`w${idx}_saida`] = w.saida;
+                flat[`w${idx}_estoque`] = w.estoque;
+                flat[`w${idx}_saldo`] = w.saldo;
+            });
+            flat.totalEntrada = item.totalEntrada;
+            flat.totalSaida = item.totalSaida;
+            flat.totalSaldo = item.totalSaldo;
+            return flat;
+        });
+    }, [displayData]);
+
+    const exportColumns = React.useMemo(() => {
+        const cols = [
+            { id: 'codFornec', label: 'Código' },
+            { id: 'fornecedor', label: 'Fornecedor' },
+        ];
+        weeks.forEach((w, idx) => {
+            cols.push({ id: `w${idx}_entrada`, label: `${w.label} - Entrada` });
+            cols.push({ id: `w${idx}_saida`, label: `${w.label} - Saída` });
+            cols.push({ id: `w${idx}_estoque`, label: `${w.label} - Estoque` });
+            cols.push({ id: `w${idx}_saldo`, label: `${w.label} - Saldo` });
+        });
+        cols.push({ id: 'totalEntrada', label: 'Total Entrada (Geral)' });
+        cols.push({ id: 'totalSaida', label: 'Total Saída (Geral)' });
+        cols.push({ id: 'totalSaldo', label: 'Total Saldo (Geral)' });
+        return cols;
+    }, [weeks]);
+
     return (
         <div className="flex flex-col gap-6 p-6">
-            <div className="flex flex-col justify-between items-start xl:flex-row xl:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-2">
-                        Visão Geral de Fornecedor (4 Semanas)
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 min-h-[80px]">
+                <div className="space-y-1">
+                    <h1 className="text-xl md:text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-2 whitespace-nowrap">
+                        Visão Geral de Fornecedor
                     </h1>
-                    <p className="text-muted-foreground mt-2 font-medium">
-                        Acompanhamento semanal de fluxo.
+                    <p className="text-muted-foreground font-medium text-xs md:text-sm">
+                        Acompanhamento semanal de fluxo consolidado.
                     </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <ExportToolbar
-                        elementIdToExport="finance-report-data"
-                        fileName="Relatorio_Financeiro_4Semanas"
-                        dataset="Relatório Financeiro"
-                        filtros={{ endDate }}
-                        availableColumns={[
-                            { id: 'codFornec', label: 'Código' },
-                            { id: 'fornecedor', label: 'Fornecedor' },
-                            { id: 'totalEntrada', label: 'Total Entrada' },
-                            { id: 'totalSaida', label: 'Total Saída' },
-                            { id: 'totalSaldo', label: 'Total Saldo' }
-                        ]}
-                        selectedColumns={['codFornec', 'fornecedor', 'totalEntrada', 'totalSaida', 'totalSaldo']}
-                    />
-                    <div className="flex items-center gap-3 bg-card/50 p-2 rounded-md border border-border/50 backdrop-blur shadow-sm">
-                        <div className="flex items-center gap-2 px-2">
-                            <span className="text-muted-foreground text-xs uppercase font-bold">Base:</span>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-[140px] bg-background/50 border-border/50 h-9"
-                            />
-                        </div>
+                <div className="flex flex-wrap md:flex-nowrap items-center gap-2 bg-card/40 p-1.5 md:p-2 rounded-xl border border-border/50 backdrop-blur-lg shadow-sm w-full xl:w-auto">
+                    <div className="flex items-center gap-1.5 flex-1 md:flex-none">
+                        <ExportToolbar
+                            elementIdToExport="finance-report-data"
+                            fileName="Relatorio_Financeiro_Completo"
+                            dataset="Relatório Financeiro"
+                            filtros={{ endDate }}
+                            availableColumns={exportColumns}
+                            selectedColumns={exportColumns.map(c => c.id)}
+                            data={exportDataFlat}
+                        />
+                    </div>
+
+                    <div className="h-6 w-px bg-border/40 hidden md:block mx-1" />
+
+                    <div className="flex items-center gap-2 px-2.5 bg-background/50 py-1 rounded-lg border border-border/40 shadow-inner flex-1 md:flex-none justify-between md:justify-start">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary outline-none transition-colors">
+                                <Filter className="h-3 w-3" />
+                                Fornecedores {selectedFornecedores.length > 0 ? `(${selectedFornecedores.length})` : '(Todos)'}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-[280px] max-h-[400px] flex flex-col p-0">
+                                <div className="p-2 border-b border-border/40 bg-muted/20 sticky top-0 z-10 space-y-2">
+                                    <Input
+                                        placeholder="Buscar código ou nome..."
+                                        value={searchFornecedor}
+                                        onChange={e => setSearchFornecedor(e.target.value)}
+                                        className="h-8 text-xs bg-background"
+                                    />
+                                    {selectedFornecedores.length > 0 && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setSelectedFornecedores([]); }}
+                                            className="text-[10px] text-rose-500 font-bold hover:text-rose-400 flex items-center gap-1 w-full"
+                                        >
+                                            <X className="h-3 w-3" /> Limpar Seleção
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-1">
+                                    {uniqueFornecedores.filter(f => f.nome.toLowerCase().includes(searchFornecedor.toLowerCase()) || f.id.includes(searchFornecedor)).map(f => (
+                                        <DropdownMenuCheckboxItem
+                                            key={f.id}
+                                            checked={selectedFornecedores.includes(f.id)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) setSelectedFornecedores(prev => [...prev, f.id]);
+                                                else setSelectedFornecedores(prev => prev.filter(id => id !== f.id));
+                                            }}
+                                            className="text-xs py-1.5 cursor-pointer max-w-full"
+                                            onSelect={(e) => e.preventDefault()}
+                                        >
+                                            <span className="font-mono text-muted-foreground mr-2 shrink-0">{f.id}</span>
+                                            <span className="truncate">{f.nome}</span>
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                    {uniqueFornecedores.filter(f => f.nome.toLowerCase().includes(searchFornecedor.toLowerCase()) || f.id.includes(searchFornecedor)).length === 0 && (
+                                        <div className="p-4 text-center text-xs text-muted-foreground">Nenhum fornecedor encontrado</div>
+                                    )}
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+                    <div className="h-6 w-px bg-border/40 hidden md:block mx-1" />
+
+                    <div className="flex items-center gap-2 px-2.5 bg-background/50 py-1 rounded-lg border border-border/40 shadow-inner flex-1 md:flex-none justify-between md:justify-start">
+                        <span className="text-muted-foreground text-[9px] uppercase font-bold tracking-widest whitespace-nowrap opacity-70">Base</span>
+                        <Input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-[120px] bg-transparent border-none h-6 p-0 focus-visible:ring-0 text-xs md:text-sm font-bold selection:bg-primary/30 cursor-pointer text-center md:text-left"
+                        />
                     </div>
                 </div>
             </div>
@@ -355,14 +466,14 @@ export default function RelatorioFinanceiro() {
                                     <TableRow className="border-b-border/50">
                                         <TableHead
                                             rowSpan={2}
-                                            className="w-[100px] min-w-[100px] max-w-[100px] font-bold text-xs uppercase py-4 px-4 sticky left-0 bg-muted border-none cursor-pointer hover:bg-muted/80 transition-colors z-30 shadow-[1px_0_0_0_#18181b]"
+                                            className="w-[100px] min-w-[100px] max-w-[100px] font-black text-[10px] md:text-xs uppercase py-4 px-4 sticky left-0 bg-[#09090b] border-r border-border/40 cursor-pointer hover:bg-muted/80 transition-colors z-35 shadow-[2px_0_0_0_rgba(0,0,0,0.2)]"
                                             onClick={() => handleSort('codFornec')}
                                         >
                                             Cód {sortConfig.key === 'codFornec' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                         </TableHead>
                                         <TableHead
                                             rowSpan={2}
-                                            className="w-[200px] min-w-[200px] max-w-[200px] font-bold text-xs uppercase py-4 px-4 sticky left-[100px] bg-muted border-none shadow-[2px_0_10px_rgba(0,0,0,0.4)] cursor-pointer hover:bg-muted/80 transition-colors z-30"
+                                            className="w-[200px] min-w-[200px] max-w-[200px] font-black text-[10px] md:text-xs uppercase py-4 px-4 sticky left-[100px] bg-[#09090b] border-r border-[#18181b] shadow-[4px_0_12px_rgba(0,0,0,0.5)] cursor-pointer hover:bg-muted/80 transition-colors z-30"
                                             onClick={() => handleSort('fornecedor')}
                                         >
                                             Fornecedor {sortConfig.key === 'fornecedor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -438,11 +549,11 @@ export default function RelatorioFinanceiro() {
                                     ) : (
                                         displayData.map((item) => (
                                             <React.Fragment key={item.codFornec}>
-                                                <TableRow className="hover:bg-primary/10 group transition-colors cursor-pointer border-b border-border/40 even:bg-muted/5 font-medium" onClick={() => toggleRow(item.codFornec)}>
-                                                    <TableCell className="w-[100px] min-w-[100px] max-w-[100px] font-mono text-[11px] py-4 px-4 sticky left-0 bg-[#09090b] group-hover:bg-muted transition-colors border-none z-10 shadow-[1px_0_0_0_#09090b]">
+                                                <TableRow className="hover:bg-primary/20 group transition-all duration-200 cursor-pointer border-b border-border/40 even:bg-muted/5 font-medium h-[60px]" onClick={() => toggleRow(item.codFornec)}>
+                                                    <TableCell className="w-[100px] min-w-[100px] max-w-[100px] font-mono text-[11px] py-4 px-4 sticky left-0 bg-[#09090b] group-hover:bg-muted/90 transition-colors border-r border-border/40 z-20 shadow-[2px_0_0_0_rgba(0,0,0,0.2)]">
                                                         <div className="truncate w-full">{item.codFornec}</div>
                                                     </TableCell>
-                                                    <TableCell className="w-[200px] min-w-[200px] max-w-[200px] font-bold text-xs py-4 px-4 sticky left-[100px] bg-[#09090b] group-hover:bg-muted transition-colors border-none shadow-[4px_0_10px_rgba(0,0,0,0.4)] z-10">
+                                                    <TableCell className="w-[200px] min-w-[200px] max-w-[200px] font-bold text-xs py-4 px-4 sticky left-[100px] bg-[#09090b] group-hover:bg-muted/90 transition-colors border-r border-border/40 shadow-[4px_0_12px_rgba(0,0,0,0.4)] z-20">
                                                         <div className="truncate w-full">{item.fornecedor}</div>
                                                     </TableCell>
 
@@ -475,10 +586,10 @@ export default function RelatorioFinanceiro() {
 
                                                 {expandedRows[item.codFornec] && item.subFornecedores.map((sub: any) => (
                                                     <TableRow key={sub.codFornec} className="bg-muted/5 hover:bg-muted/10">
-                                                        <TableCell className="w-[100px] min-w-[100px] max-w-[100px] font-mono text-[10px] py-2 px-4 pl-8 sticky left-0 bg-[#18181b] z-10 border-none text-muted-foreground shadow-[1px_0_0_0_#18181b]">
+                                                        <TableCell className="w-[100px] min-w-[100px] max-w-[100px] font-mono text-[10px] py-2 px-4 pl-8 sticky left-0 bg-[#121214] z-10 border-r border-border/40 text-muted-foreground shadow-[2px_0_0_0_rgba(0,0,0,0.1)]">
                                                             <div className="truncate w-full">↳ {sub.codFornec}</div>
                                                         </TableCell>
-                                                        <TableCell className="w-[200px] min-w-[200px] max-w-[200px] text-[10px] py-2 px-4 sticky left-[100px] bg-[#18181b] z-10 border-none shadow-[4px_0_10px_rgba(0,0,0,0.4)] italic">
+                                                        <TableCell className="w-[200px] min-w-[200px] max-w-[200px] text-[10px] py-2 px-4 sticky left-[100px] bg-[#121214] z-10 border-r border-border/40 shadow-[4px_0_8px_rgba(0,0,0,0.3)] italic">
                                                             <div className="truncate w-full">{sub.fornecedor}</div>
                                                         </TableCell>
 

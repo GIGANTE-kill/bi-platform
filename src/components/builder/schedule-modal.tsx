@@ -10,12 +10,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { CalendarClock, Plus, List, Trash2, Edit2, Power, History, Clock, Mail, Users } from "lucide-react";
+import { CalendarClock, Plus, List, Trash2, Edit2, Power, History, Clock, Mail, Users, Filter, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     getSchedules,
     createSchedule,
@@ -34,6 +40,7 @@ interface ScheduleModalProps {
     dataset?: string;
     filtros?: any;
     reportName?: string;
+    availableFornecedores?: string[];
 }
 
 export function ScheduleModal({
@@ -43,7 +50,8 @@ export function ScheduleModal({
     defaultColumns,
     dataset = "GERAL",
     filtros = {},
-    reportName = ""
+    reportName = "",
+    availableFornecedores = []
 }: ScheduleModalProps) {
     const [activeTab, setActiveTab] = useState("list");
     const [schedules, setSchedules] = useState<any[]>([]);
@@ -56,6 +64,10 @@ export function ScheduleModal({
     const [frequency, setFrequency] = useState("WEEKLY");
     const [selectedCols, setSelectedCols] = useState<string[]>(defaultColumns);
     const [scheduleName, setScheduleName] = useState("");
+
+    // Filtro de Fornecedor no Agendamento
+    const [selectedFornecedores, setSelectedFornecedores] = useState<string[]>([]);
+    const [searchFornecedor, setSearchFornecedor] = useState("");
 
     const fetchSchedules = useCallback(async () => {
         setIsLoading(true);
@@ -81,6 +93,8 @@ export function ScheduleModal({
         setFrequency("WEEKLY");
         setSelectedCols(defaultColumns);
         setScheduleName(reportName ? `Envio: ${reportName}` : "Novo Agendamento");
+        setSelectedFornecedores([]);
+        setSearchFornecedor("");
         setEditingId(null);
     };
 
@@ -93,6 +107,17 @@ export function ScheduleModal({
             setSelectedCols(JSON.parse(schedule.selectedColumns));
         } catch (e) {
             setSelectedCols(defaultColumns);
+        }
+
+        try {
+            const savedFiltros = JSON.parse(schedule.filtros || "{}");
+            if (savedFiltros.fornecedores && Array.isArray(savedFiltros.fornecedores)) {
+                setSelectedFornecedores(savedFiltros.fornecedores);
+            } else {
+                setSelectedFornecedores([]);
+            }
+        } catch (e) {
+            setSelectedFornecedores([]);
         }
         setActiveTab("form");
     };
@@ -132,7 +157,10 @@ export function ScheduleModal({
         const data = {
             nome: scheduleName,
             dataset,
-            filtros,
+            filtros: {
+                ...filtros,
+                fornecedores: selectedFornecedores
+            },
             selectedColumns: selectedCols,
             emails,
             frequency
@@ -317,6 +345,66 @@ export function ScheduleModal({
                                         className="bg-background/50 border-input"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <label className="text-sm font-semibold flex items-center gap-1.5 text-primary">
+                                    <Filter className="h-4 w-4" /> Filtro de Fornecedor (Opcional)
+                                </label>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full sm:max-w-md justify-between bg-background/50 border-input font-normal">
+                                            <span>
+                                                {selectedFornecedores.length > 0
+                                                    ? `${selectedFornecedores.length} fornecedor(es) selecionado(s)`
+                                                    : 'Todos os Fornecedores (Sem Filtro)'}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                {selectedFornecedores.length > 0 && (
+                                                    <div
+                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFornecedores([]); }}
+                                                        className="text-[10px] bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 px-1.5 py-0.5 rounded-sm flex items-center mr-1"
+                                                    >
+                                                        Limpar
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className="w-full sm:w-[350px] max-h-[300px] flex flex-col p-0 bg-background/95 backdrop-blur border-border/50">
+                                        <div className="p-2 border-b border-border/40 bg-muted/20 sticky top-0 z-10">
+                                            <Input
+                                                placeholder="Buscar fornecedor..."
+                                                value={searchFornecedor}
+                                                onChange={e => setSearchFornecedor(e.target.value)}
+                                                className="h-8 text-xs bg-background"
+                                            />
+                                        </div>
+                                        <div className="overflow-y-auto flex-1 p-1">
+                                            {availableFornecedores.length === 0 ? (
+                                                <div className="p-4 text-center text-xs text-muted-foreground">O relatório não possui fornecedores carregados em tela para filtrar.</div>
+                                            ) : (
+                                                availableFornecedores.filter(f => f.toLowerCase().includes(searchFornecedor.toLowerCase())).map(f => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={f}
+                                                        checked={selectedFornecedores.includes(f)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) setSelectedFornecedores(prev => [...prev, f]);
+                                                            else setSelectedFornecedores(prev => prev.filter(id => id !== f));
+                                                        }}
+                                                        className="text-xs py-1.5 cursor-pointer"
+                                                        onSelect={(e) => e.preventDefault()}
+                                                    >
+                                                        <span className="truncate">{f}</span>
+                                                    </DropdownMenuCheckboxItem>
+                                                ))
+                                            )}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Se não selecionar nenhum, o relatório será enviado com os dados de todos os fornecedores (respeitando o filtro de data padrão).
+                                </p>
                             </div>
 
                             <div className="grid gap-3 pt-4 border-t border-border/30">

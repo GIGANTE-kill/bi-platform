@@ -1,0 +1,6 @@
+# Minuto Hora Dia Mês DiaDaSemana Comando
+# Roda todo dia às 08:00 chamando a rota de relatório diário (type=yesterday)
+0 8 * * * wget -qO- --header="Authorization: Bearer my-secure-cron-secret" http://app:3000/api/cron/relatorio?type=yesterday &> /dev/null
+
+# Roda todo dia 1º do mês às 08:00 chamando a rota de relatório mensal (type=month)
+0 8 1 * * wget -qO- --header="Authorization: Bearer my-secure-cron-secret" http://app:3000/api/cron/relatorio?type=month &> /dev/null

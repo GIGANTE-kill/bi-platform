@@ -206,87 +206,95 @@ export default function ReportBuilder() {
                         Personalize, visualize e agende seus relatórios.
                     </p>
 
-                    <div className="mt-4 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 bg-card/50 p-2 sm:p-3 rounded-md border border-border/50 backdrop-blur shadow-sm">
-                        <div className="flex items-center w-full sm:w-auto">
-                            <Input
-                                placeholder="Cód. Fornecedor..."
-                                value={fornecedor}
-                                onChange={(e) => setFornecedor(e.target.value)}
-                                className="w-full sm:w-[150px] bg-background/50 border-border/50 h-9"
-                            />
-                        </div>
+                    <div className="mt-4 bg-card/40 p-3 rounded-xl border border-border/50 backdrop-blur shadow-sm">
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* Input Buscar Cód/Fornecedor */}
+                            <div className="flex-1 min-w-[200px]">
+                                <Input
+                                    placeholder="Buscar código ou fornecedor..."
+                                    value={fornecedor}
+                                    onChange={(e) => setFornecedor(e.target.value)}
+                                    className="w-full bg-background/50 border-input shadow-inner h-9"
+                                />
+                            </div>
 
-                        <div className="flex items-center w-full sm:w-auto sm:border-l sm:border-border/50 sm:pl-3">
-                            <Select value={selectedFornecedorLocal} onValueChange={setSelectedFornecedorLocal}>
-                                <SelectTrigger className="w-full sm:w-[180px] bg-background/50 border-border/50 h-9">
-                                    <SelectValue placeholder="Fornecedor: Todos" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="todos">Todos na Tela</SelectItem>
-                                    {uniqueFornecedores.map(f => (
-                                        <SelectItem key={String(f)} value={String(f)} className="text-sm truncate max-w-[200px]">{String(f)}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                            {/* Select Filtro de Tela */}
+                            <div className="w-full sm:w-[220px]">
+                                <Select value={selectedFornecedorLocal} onValueChange={setSelectedFornecedorLocal}>
+                                    <SelectTrigger className="w-full bg-background/50 border-input shadow-inner h-9">
+                                        <SelectValue placeholder="Fornecedor: Todos" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="todos">Todos na Tela</SelectItem>
+                                        {uniqueFornecedores.map(f => (
+                                            <SelectItem key={String(f)} value={String(f)} className="text-sm truncate max-w-[200px]">{String(f)}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
-                        <div className="flex flex-row items-center w-full sm:w-auto gap-2 sm:border-l sm:border-border/50 sm:pl-3">
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full sm:w-[130px] bg-background/50 border-border/50 h-9 flex-1"
-                            />
-                            <span className="text-muted-foreground text-sm shrink-0">até</span>
-                            <Input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full sm:w-[130px] bg-background/50 border-border/50 h-9 flex-1"
-                            />
-                        </div>
+                            {/* Filtro Data */}
+                            <div className="flex items-center gap-2 bg-background/50 px-2 py-1 h-9 rounded-md border border-input shadow-inner w-full sm:w-auto">
+                                <Input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-[125px] bg-transparent border-none p-0 text-sm focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                                />
+                                <span className="text-muted-foreground text-xs font-medium">até</span>
+                                <Input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-[125px] bg-transparent border-none p-0 text-sm focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                                />
+                            </div>
 
-                        <div className="flex flex-row flex-wrap sm:flex-nowrap items-center w-full sm:w-auto gap-2 sm:border-l sm:border-border/50 sm:pl-3">
-                            <Button
-                                onClick={handleApplyFilters}
-                                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/50 h-9 px-4 shrink-0 flex-1 sm:flex-none"
-                                variant="outline"
-                            >
-                                Buscar Dados
-                            </Button>
+                            {/* Separator */}
+                            <div className="h-6 w-px bg-border/60 hidden xl:block mx-1" />
 
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="h-9 gap-2 border-border/50 bg-background/50 text-foreground px-4 shrink-0 flex-1 sm:flex-none">
-                                        <Columns3 className="h-4 w-4 shrink-0" />
-                                        <span className="inline">Colunas</span>
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur border-border/50">
-                                    <DropdownMenuLabel>Selecionar Colunas</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <ScrollArea className="h-64">
-                                        <div className="p-1">
-                                            {currentDatasetInfo.columns.map((col) => (
-                                                <DropdownMenuCheckboxItem
-                                                    key={col.id}
-                                                    checked={selectedColumns.includes(col.id)}
-                                                    onCheckedChange={() => toggleColumn(col.id)}
-                                                    onSelect={(e) => e.preventDefault()}
-                                                    className="text-sm cursor-pointer"
-                                                >
-                                                    {col.label}
-                                                </DropdownMenuCheckboxItem>
-                                            ))}
-                                        </div>
-                                    </ScrollArea>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            {/* Ações */}
+                            <div className="flex items-center gap-2 w-full xl:w-auto mt-2 xl:mt-0">
+                                <Button
+                                    onClick={handleApplyFilters}
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-6 font-semibold flex-1 xl:flex-none shadow-md shadow-primary/10"
+                                >
+                                    Buscar Dados
+                                </Button>
+
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="h-9 gap-2 border-input bg-background/50 text-foreground px-4 shrink-0 shadow-sm hover:bg-muted/50">
+                                            <Columns3 className="h-4 w-4 text-muted-foreground" />
+                                            <span>Colunas ({selectedColumns.length})</span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-64 bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
+                                        <DropdownMenuLabel className="font-bold text-primary">Selecionar Colunas</DropdownMenuLabel>
+                                        <DropdownMenuSeparator className="bg-border/50" />
+                                        <ScrollArea className="h-72">
+                                            <div className="p-1 space-y-1">
+                                                {currentDatasetInfo.columns.map((col) => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={col.id}
+                                                        checked={selectedColumns.includes(col.id)}
+                                                        onCheckedChange={() => toggleColumn(col.id)}
+                                                        onSelect={(e) => e.preventDefault()}
+                                                        className="text-sm cursor-pointer rounded-md hover:bg-primary/10 data-highlighted:bg-primary/10"
+                                                    >
+                                                        {col.label}
+                                                    </DropdownMenuCheckboxItem>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0 w-full xl:w-auto">
+                <div className="bg-card/40 p-2 md:p-3 rounded-xl border border-border/50 backdrop-blur shadow-sm w-full xl:w-auto h-fit flex items-center justify-center">
                     <ExportToolbar
                         elementIdToExport="builder-report-data"
                         fileName={`Builder_${dataset}`}
@@ -294,6 +302,8 @@ export default function ReportBuilder() {
                         filtros={appliedFilters}
                         selectedColumns={selectedColumns}
                         availableColumns={currentDatasetInfo.columns}
+                        data={filteredData}
+                        availableFornecedores={Array.from(new Set(activeData.map(item => item.fornecedor))).filter(Boolean).sort() as string[]}
                     />
                 </div>
             </div>
@@ -330,6 +340,7 @@ export default function ReportBuilder() {
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full min-w-max pb-4">
                                     <DndContext
+                                        id="dnd-builder"
                                         sensors={sensors}
                                         collisionDetection={closestCenter}
                                         onDragEnd={handleDragEnd}

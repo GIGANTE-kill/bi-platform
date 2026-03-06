@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-bi_platform}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -31,8 +33,21 @@ services:
     networks:
       - Servidores
 
+  cron:
+    image: alpine:latest
+    container_name: bi-cron
+    restart: always
+    volumes:
+      - ./crontab:/etc/crontabs/root
+    command: crond -f -d 8
+    depends_on:
+      - app
+    networks:
+      - Servidores
+
 volumes:
   postgres_data:
+
 
 networks:
   Servidores:

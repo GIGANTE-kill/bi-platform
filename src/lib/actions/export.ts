@@ -12,7 +12,7 @@ export async function sendReportEmail({
   to: string,
   subject: string,
   body: string,
-  attachmentBase64: string,
+  attachmentBase64: string, // Pode ser base64 puro ou com o prefixo 'data:...'
   fileName: string
 }) {
   console.log(`Iniciando envio de e-mail real para ${to}...`);
@@ -37,7 +37,9 @@ export async function sendReportEmail({
       attachments: [
         {
           filename: fileName,
-          content: attachmentBase64.split("base64,")[1],
+          content: attachmentBase64.includes("base64,")
+            ? attachmentBase64.split("base64,")[1]
+            : attachmentBase64,
           encoding: 'base64'
         }
       ]

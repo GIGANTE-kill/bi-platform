@@ -20,27 +20,31 @@ export const metadata: Metadata = {
   description: "Plataforma avançada de BI e Dashboard",
 };
 
+import { AuthProvider } from "@/components/providers/AuthProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="flex h-screen w-full bg-background overflow-hidden relative">
-          <Sidebar />
-          <div className="flex flex-1 flex-col md:pl-64 min-w-0">
-            <Header />
-            <main className="flex-1 flex flex-col min-h-0 relative overflow-y-auto">
-              <div className="p-3 md:p-6 w-full flex-1 flex flex-col min-h-0">
-                {children}
-              </div>
-            </main>
+        <AuthProvider>
+          <div className="flex h-screen w-full bg-background overflow-hidden relative">
+            <Sidebar />
+            <div className="flex flex-1 flex-col md:pl-64 min-w-0">
+              <Header />
+              <main className="flex-1 flex flex-col min-h-0 relative overflow-y-auto">
+                <div className="p-3 md:p-6 w-full flex-1 flex flex-col min-h-0">
+                  {children}
+                </div>
+              </main>
+            </div>
           </div>
-        </div>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

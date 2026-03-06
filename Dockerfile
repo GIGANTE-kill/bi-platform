@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # Etapa 2: Build do projeto
-FROM node:20-slim AS builder
+FROM node:20-slim AS builder-stage
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -18,44 +18,24 @@ COPY . .
 RUN DATABASE_URL="postgresql://placeholder:5432" npx prisma generate
 RUN npm run build
 
-# Etapa 3: Imagem final de execução
+# Etapa 3: Imagem final de execução (MUITO MAIS LEVE)
 FROM node:20-slim AS runner
 WORKDIR /app
-
-# Instala Chromium e dependências necessárias conforme seu exemplo
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    libasound2 \
-    libnss3 \
-    lsb-release \
-    xdg-utils \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Variáveis de ambiente para o Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN groupadd --system --gid 1001 nodejs
-RUN useradd --system --uid 1001 nextjs
+# Criar usuário padrão
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-
-# Configuração do Standalone do Next.js
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copiar apenas o necessário do estágio de build
+COPY --from=builder-stage /app/public ./public
+COPY --from=builder-stage --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder-stage --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder-stage --chown=nextjs:nodejs /app/package.json ./package.json
 
 USER nextjs
 
 EXPOSE 3000
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-
-CMD ["node", "server.js"]
+CMD ["npm", "run", "start"]
