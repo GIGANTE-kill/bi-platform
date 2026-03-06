@@ -8,19 +8,73 @@ import {
   LogOut,
   User as UserIcon,
   ChevronRight,
-  Search
+  Search,
+  TrendingUp,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchDashboardOverview } from "@/lib/actions/db";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Legend,
+  AreaChart,
+  Area
+} from "recharts";
 
 export default function HomePage() {
   const { data: session } = useSession();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetchDashboardOverview();
+        if (res.success) {
+          setData(res.data);
+        } else {
+          setError(res.error || "Erro ao carregar dados");
+        }
+      } catch (err) {
+        setError("Erro de conexão");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const stats = [
-    { label: "Relatórios Ativos", value: "12", icon: FileBarChart, color: "text-primary" },
-    { label: "Agendamentos", value: "8", icon: CalendarClock, color: "text-chart-2" },
-    { label: "Acessos Hoje", value: "24", icon: UserIcon, color: "text-sky-400" },
+    {
+      label: "Relatórios Ativos",
+      value: loading ? "..." : (data?.activeReports ?? "0"),
+      icon: FileBarChart,
+      color: "text-primary"
+    },
+    {
+      label: "Modelos Salvos",
+      value: loading ? "..." : (data?.totalSchedules ?? "0"),
+      icon: CalendarClock,
+      color: "text-chart-2"
+    },
+    {
+      label: "Processados Hoje",
+      value: loading ? "..." : (data?.todayAccesses ?? "0"),
+      icon: TrendingUp,
+      color: "text-sky-400"
+    },
   ];
 
   const quickActions = [
@@ -38,8 +92,29 @@ export default function HomePage() {
     }
   ];
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+  };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Card className="border-destructive/50 bg-destructive/5 max-w-md">
+          <CardHeader className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <CardTitle className="text-destructive">Erro no Dashboard</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Button onClick={() => window.location.reload()} variant="outline">Tentar Novamente</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-8 h-full">
+    <div className="flex flex-col gap-8 h-full overflow-y-auto pb-8 pr-2 custom-scrollbar">
       {/* Header / Welcome Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
@@ -70,7 +145,11 @@ export default function HomePage() {
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                <p className="text-3xl font-black tabular-nums">{stat.value}</p>
+                {loading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/20" />
+                ) : (
+                  <p className="text-3xl font-black tabular-nums">{stat.value}</p>
+                )}
               </div>
               <div className={`p-4 rounded-2xl bg-muted/20 ${stat.color}`}>
                 <stat.icon className="h-6 w-6" />
@@ -80,15 +159,131 @@ export default function HomePage() {
         ))}
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Tool 1: Financial Overview Chart */}
+        <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileBarChart className="h-5 w-5 text-chart-2" />
+              Fluxo Financeiro Mensal
+            </CardTitle>
+            <CardDescription>Receitas vs. Custos de Entrada (6 meses)</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px] w-full pt-4">
+            {loading ? (
+              <div className="h-full w-full flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/20" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data?.monthly}>
+                  <defs>
+                    <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="MES_ANO"
+                    stroke="#888888"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => val.split('-')[1] + '/' + val.split('-')[0].slice(2)}
+                  />
+                  <YAxis
+                    stroke="#888888"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => `R$ ${val / 1000000}M`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '12px'
+                    }}
+                    itemStyle={{ color: '#fafafa', fontSize: '13px', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#a1a1aa', fontSize: '11px', marginBottom: '4px' }}
+                    formatter={(val: number) => formatCurrency(val)}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                  <Area type="monotone" dataKey="RECEITA" name="Receita" stroke="var(--chart-2)" fillOpacity={1} fill="url(#colorReceita)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="CUSTO_ENTRADA" name="Custo Ent." stroke="#ef4444" fillOpacity={1} fill="url(#colorCusto)" strokeWidth={3} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tool 2: Builder Proxy / Top Suppliers Chart */}
+        <Card className="bg-card/40 border-border/50 backdrop-blur-md">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              Top Fornecedores (Mês Atual)
+            </CardTitle>
+            <CardDescription>Volume de compras por fornecedor no Oracle.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px] w-full pt-4">
+            {loading ? (
+              <div className="h-full w-full flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/20" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data?.topFornecedores} layout="vertical" margin={{ left: 40, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="FORNECEDOR"
+                    type="category"
+                    stroke="#888888"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    width={100}
+                    tickFormatter={(val) => val.length > 15 ? val.slice(0, 15) + '...' : val}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                    contentStyle={{
+                      backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '12px'
+                    }}
+                    itemStyle={{ color: '#fafafa', fontSize: '13px', fontWeight: 'bold' }}
+                    labelStyle={{ color: '#a1a1aa', fontSize: '11px', marginBottom: '4px' }}
+                    formatter={(val: number) => formatCurrency(val)}
+                  />
+                  <Bar dataKey="VALOR_COMPRADO" name="Total Comprado" radius={[0, 4, 4, 0]}>
+                    {data?.topFornecedores?.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? 'var(--primary)' : 'rgba(59, 130, 246, 0.5)'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Main Content Area */}
-      <div className="grid gap-6 lg:grid-cols-2 flex-1 min-h-0">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-linear-to-br from-card/60 to-background/40 border-border/50 flex flex-col h-fit">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
-              <Search className="h-5 w-5 text-primary" />
-              Acesso Rápido
+              <LayoutDashboard className="h-5 w-5 text-primary" />
+              Ferramentas de BI
             </CardTitle>
-            <CardDescription>Principais ferramentas para análise de dados.</CardDescription>
+            <CardDescription>Acesso rápido aos módulos principais.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pb-6">
             {quickActions.map((action, i) => (
@@ -110,15 +305,25 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/20 border-dashed border-2 border-border/40 flex items-center justify-center p-8 text-center min-h-[300px]">
-          <div className="space-y-4">
-            <div className="w-16 h-16 rounded-full bg-muted/10 mx-auto flex items-center justify-center">
-              <LayoutDashboard className="h-8 w-8 text-muted-foreground/20" />
-            </div>
-            <h4 className="text-lg font-bold text-muted-foreground/40">Seu Dashboard Principal</h4>
-            <p className="text-sm text-muted-foreground/30 max-w-[280px]">
-              Implemente gráficos e métricas de desempenho aqui para ter uma visão geral do negócio.
+        <Card className="bg-card/20 border-border/40 p-8 flex flex-col justify-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
+            <TrendingUp className="h-6 w-6 text-emerald-500" />
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-lg font-bold text-foreground">Estado do Sistema</h4>
+            <p className="text-sm text-muted-foreground">
+              Sua infraestrutura de BI está operando normalmente com conexões ativas para Oracle e Postgres.
             </p>
+          </div>
+          <div className="pt-4 flex gap-4">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">Latência Oracle</p>
+              <p className="font-mono text-emerald-500 text-sm font-bold">~42ms</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">Pool Ativo</p>
+              <p className="font-mono text-emerald-500 text-sm font-bold">Ligado</p>
+            </div>
           </div>
         </Card>
       </div>

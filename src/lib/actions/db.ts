@@ -1,6 +1,7 @@
 "use server";
 
 import oracledb from 'oracledb';
+import { prisma } from "@/lib/prisma";
 
 export async function fetchABCData(startDate?: string, endDate?: string, fornecedor?: string) {
   console.log("Conectando ao Oracle DB para Curva ABC...", { startDate, endDate, fornecedor });
@@ -275,16 +276,30 @@ export async function saveReportTemplate(data: { nome: string; dataset: string; 
 }
 
 export async function fetchDashboardOverview() {
-  console.log("Buscando dados gerais para o Dashboard (Oracle DB)...");
+  console.log("Buscando dados gerais para o Dashboard (Oracle + Prisma)...");
   let connection;
 
   try {
+    // PRISMA STATS
+    const activeReports = await prisma.reportTemplate.count({ where: { active: true } });
+    const totalSchedules = await prisma.reportTemplate.count();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayAccesses = await prisma.reportLog.count({
+      where: {
+        sentAt: {
+          gte: today
+        }
+      }
+    });
+
+    // ORACLE STATS
     if (process.env.ORACLE_CLIENT_DIR && !(globalThis as any).isOracleInitialized) {
       try {
         oracledb.initOracleClient({ libDir: process.env.ORACLE_CLIENT_DIR });
         (globalThis as any).isOracleInitialized = true;
       } catch (initErr) {
-        console.warn("Aviso ao inicializar Oracle Client:", initErr);
         (globalThis as any).isOracleInitialized = true;
       }
     }
@@ -354,6 +369,9 @@ export async function fetchDashboardOverview() {
     return {
       success: true,
       data: {
+        activeReports,
+        totalSchedules,
+        todayAccesses,
         monthly: monthlyResult.rows,
         topFornecedores: topFornecedoresResult.rows
       }
