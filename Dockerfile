@@ -1,20 +1,15 @@
-# Etapa 1: Instala dependências
-FROM node:20-slim AS deps
+# Etapa 1: Instala dependências (USANDO IMAGEM COMPLETA PARA TER TODOS OS HEADERS C++)
+FROM node:20 AS deps
 WORKDIR /app
 
-# Instalar dependências de build necessárias para pacotes nativos
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
+# Em imagens completas já temos build-essential, mas garantimos o necessário
 COPY package.json package-lock.json ./
-# Usamos install em vez de ci para maior resiliência em ambientes de dev/prod mistos
+
+# Instalação resiliente para ambientes mistos
 RUN npm install --no-audit --no-fund
 
 # Etapa 2: Build do projeto
-FROM node:20-slim AS builder-stage
+FROM node:20 AS builder-stage
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -23,9 +18,12 @@ COPY . .
 RUN DATABASE_URL="postgresql://placeholder:5432" npx prisma generate
 RUN npm run build
 
-# Etapa 3: Imagem final de execução (MUITO MAIS LEVE)
+# Etapa 3: Imagem final de execução (VOLTAMOS PARA SLIM PARA SER LEVE)
 FROM node:20-slim AS runner
 WORKDIR /app
+
+# Instalar libaio1 que é necessário para o oracledb em alguns modos
+RUN apt-get update && apt-get install -y libaio1 && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
