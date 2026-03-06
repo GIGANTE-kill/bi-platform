@@ -2,11 +2,16 @@
 FROM node:20-slim AS deps
 WORKDIR /app
 
-# Em Debian/Slim, precisamos de alguns pacotes básicos para o npm ci
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Instalar dependências de build necessárias para pacotes nativos
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# Usamos install em vez de ci para maior resiliência em ambientes de dev/prod mistos
+RUN npm install --no-audit --no-fund
 
 # Etapa 2: Build do projeto
 FROM node:20-slim AS builder-stage

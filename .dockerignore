@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.vscode
+*.log
+.env
+.env.local
+out
+public/reports
+Dockerfile
+docker-compose.yml
+docker-compose.override.yaml
