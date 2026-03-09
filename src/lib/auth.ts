@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import fs from "fs";
 import path from "path";
 
-const logFile = path.join(process.cwd(), "auth-debug.log");
+const logFile = path.join("/tmp", "auth-debug.log");
 
 function logDebug(message: string, data?: any) {
     const timestamp = new Date().toISOString();

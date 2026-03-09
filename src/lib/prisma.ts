@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
-const logFile = path.join(process.cwd(), "auth-debug.log");
+const logFile = path.join("/tmp", "auth-debug.log");
 function logPrisma(msg: string) {
     fs.appendFileSync(logFile, `[PRISMA_INIT] ${msg}\n`);
 }
