@@ -56,6 +56,7 @@ RUN groupadd --system --gid 1001 nodejs && \
 
 # Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
