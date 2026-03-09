@@ -376,7 +376,11 @@ export async function fetchDashboardOverview() {
         topFornecedores: topFornecedoresResult.rows
       }
     };
-  } catch (error) {
+  } catch (error: any) {
+    const timestamp = new Date().toISOString();
+    try {
+      require("fs").appendFileSync("/tmp/auth-debug.log", `[${timestamp}] [ORACLE_ERROR] ${error.message} - ${error.stack}\n`);
+    } catch (e) { }
     console.error("Erro ao buscar dados do Dashboard via Oracle:", error);
     return { success: false, error: "Falha na conexão DB do dashboard.", data: null };
   } finally {
