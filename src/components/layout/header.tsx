@@ -23,7 +23,7 @@ export function Header() {
                         <SidebarNav onClick={() => setOpen(false)} />
                     </SheetContent>
                 </Sheet>
-                <h2 className="text-lg font-semibold tracking-tight truncate">System Overview</h2>
+                {/* Title removed per user request */}
             </div>
             <div className="flex items-center gap-2 md:gap-4 shrink-0">
                 <Button variant="outline" size="icon" className="relative group">

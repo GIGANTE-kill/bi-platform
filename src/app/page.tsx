@@ -11,7 +11,8 @@ import {
   Search,
   TrendingUp,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
@@ -36,23 +37,34 @@ export default function HomePage() {
   const { data: session } = useSession();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetchDashboardOverview();
-        if (res.success) {
-          setData(res.data);
-        } else {
-          setError(res.error || "Erro ao carregar dados");
+  async function loadData(force = false) {
+    if (force) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const res = await fetchDashboardOverview({ forceRefresh: force });
+      if (res.success) {
+        setData(res.data);
+        // If the action returned cachedAt, we can use it
+        if ((res as any).cachedAt) {
+          setData((prev: any) => ({ ...prev, _cachedAt: (res as any).cachedAt }));
         }
-      } catch (err) {
-        setError("Erro de conexão");
-      } finally {
-        setLoading(false);
+        setError(null);
+      } else {
+        setError(res.error || "Erro ao carregar dados");
       }
+    } catch (err) {
+      setError("Erro de conexão");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  }
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -96,6 +108,12 @@ export default function HomePage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
   };
 
+  const formatDate = (dateInput: any) => {
+    if (!dateInput) return "";
+    const date = new Date(dateInput);
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -106,7 +124,7 @@ export default function HomePage() {
             <CardDescription>{error}</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <Button onClick={() => window.location.reload()} variant="outline">Tentar Novamente</Button>
+            <Button onClick={() => loadData(true)} variant="outline">Tentar Novamente</Button>
           </CardContent>
         </Card>
       </div>
@@ -121,16 +139,30 @@ export default function HomePage() {
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-chart-2 whitespace-nowrap">
             Bem-vindo, {session?.user?.name || "Usuário"}!
           </h1>
-          <p className="text-muted-foreground font-medium">
-            Plataforma de BI - Painel Administrativo de Gerência.
-          </p>
+          <div className="flex items-center gap-2 text-muted-foreground font-medium">
+            <p>Plataforma de BI - Painel Administrativo.</p>
+            {data?._cachedAt && (
+              <span className="text-[10px] bg-muted/30 px-2 py-0.5 rounded-full border border-border/50">
+                Atualizado às {formatDate(data._cachedAt)}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 bg-card/40 p-1.5 rounded-xl border border-border/50 backdrop-blur-lg">
-          <div className="px-3 py-1.5 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sessão Ativa</span>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadData(true)}
+            disabled={refreshing || loading}
+            className="text-primary hover:text-primary hover:bg-primary/10 gap-2 font-bold"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? "Processando..." : "Reprocessar"}
+          </Button>
+
+          <div className="h-4 w-px bg-border/50 mx-1" />
+
           <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 gap-2 font-bold">
             <LogOut className="h-4 w-4" />
             Sair

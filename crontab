@@ -4,3 +4,6 @@
 
 # Roda todo dia 1º do mês às 08:00 chamando a rota de relatório mensal (type=month)
 0 8 1 * * wget -qO- --header="Authorization: Bearer my-secure-cron-secret" http://app:3000/api/cron/relatorio?type=month &> /dev/null
+
+# Sincronizar Dashboard todo dia às 05:00
+0 5 * * * cd /app && node scripts/daily-sync.js >> /tmp/cron.log 2>&1

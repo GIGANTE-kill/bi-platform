@@ -54,3 +54,9 @@ model ReportLog {
   sentAt       DateTime        @default(now())
   errorMessage String?
 }
+
+model DashboardCache {
+  id        String   @id @default("singleton")
+  data      String // JSON stringified data
+  updatedAt DateTime @updatedAt
+}

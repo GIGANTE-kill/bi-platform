@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 export default function RootLayout({
   children,
@@ -33,17 +34,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <div className="flex h-screen w-full bg-background overflow-hidden relative">
-            <Sidebar />
-            <div className="flex flex-1 flex-col md:pl-64 min-w-0">
-              <Header />
-              <main className="flex-1 flex flex-col min-h-0 relative overflow-y-auto">
-                <div className="p-3 md:p-6 w-full flex-1 flex flex-col min-h-0">
-                  {children}
-                </div>
-              </main>
-            </div>
-          </div>
+          <DashboardLayout>
+            {children}
+          </DashboardLayout>
         </AuthProvider>
         <Toaster />
       </body>

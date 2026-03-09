@@ -257,37 +257,78 @@ export async function saveReportTemplate(data: { nome: string; dataset: string; 
   return { success: true, templateId: "mock-id-123" };
 }
 
-export async function fetchDashboardOverview() {
-  console.log("Buscando dados gerais para o Dashboard (Oracle + Prisma)...");
-  let connection;
+export async function fetchDashboardOverview(options: { forceRefresh?: boolean } = {}) {
+  const forceRefresh = options.forceRefresh || false;
+  console.log(`Buscando dados gerais para o Dashboard (forceRefresh: ${forceRefresh})...`);
 
+  const timestamp = () => new Date().toISOString();
+  const logToDebug = (msg: string) => {
+    try {
+      require("fs").appendFileSync("/tmp/auth-debug.log", `[${timestamp()}] ${msg}\n`);
+    } catch (e) { }
+  };
+
+  // 1. Check Cache
+  if (!forceRefresh) {
+    try {
+      const cache: any = await prisma.$queryRawUnsafe(`SELECT data, "updatedAt" FROM "DashboardCache" WHERE id = 'singleton'`);
+      if (cache && cache.length > 0) {
+        logToDebug("[DASHBOARD] Cache hit. Returning saved data.");
+        const parsedData = JSON.parse(cache[0].data);
+        return {
+          success: true,
+          data: parsedData,
+          cachedAt: cache[0].updatedAt
+        };
+      }
+      logToDebug("[DASHBOARD] Cache miss. Fetching fresh data.");
+    } catch (e: any) {
+      logToDebug(`[DASHBOARD_CACHE_ERROR] ${e.message}`);
+    }
+  }
+
+  let connection;
+  const resultData: any = {
+    activeReports: 0,
+    totalSchedules: 0,
+    todayAccesses: 0,
+    monthly: [],
+    topFornecedores: []
+  };
+
+  // 2. DATABASE STATS (PRISMA)
   try {
-    // PRISMA STATS
-    const activeReports = await prisma.reportTemplate.count({ where: { active: true } });
-    const totalSchedules = await prisma.reportTemplate.count();
+    logToDebug("[DASHBOARD] Fetching Prisma stats...");
+    const [activeReports, totalSchedules] = await Promise.all([
+      prisma.reportTemplate.count({ where: { active: true } }).catch(() => 0),
+      prisma.reportTemplate.count().catch(() => 0)
+    ]);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayAccesses = await prisma.reportLog.count({
       where: {
-        sentAt: {
-          gte: today
-        }
+        sentAt: { gte: today }
       }
-    });
+    }).catch(() => 0);
 
-    // ORACLE STATS
-    // Oracle initialization in Docker is handled via LD_LIBRARY_PATH
+    resultData.activeReports = activeReports;
+    resultData.totalSchedules = totalSchedules;
+    resultData.todayAccesses = todayAccesses;
+    logToDebug("[DASHBOARD] Prisma stats loaded.");
+  } catch (error: any) {
+    logToDebug(`[DASHBOARD_ERROR] Prisma failure: ${error.message}`);
+  }
 
+  // 3. ORACLE STATS
+  try {
+    logToDebug("[DASHBOARD] Fetching Oracle stats...");
     connection = await oracledb.getConnection({
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       connectString: process.env.DB_CONNECT_STRING,
     });
 
-    const binds: any = {};
-
-    // 1. Receita e Entradas Mensais (Últimos 6 Meses)
     const monthlyQuery = `
       WITH MESES AS (
           SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -5 + (LEVEL - 1)), 'YYYY-MM') AS MES_ANO
@@ -322,7 +363,6 @@ export async function fetchDashboardOverview() {
       ORDER BY M.MES_ANO
     `;
 
-    // 2. Top 5 Fornecedores por Entrada no mês atual
     const topFornecedoresQuery = `
       SELECT F.FORNECEDOR,
              SUM(NVL(M.QT, 0) * NVL(M.PUNIT, 0)) AS VALOR_COMPRADO
@@ -338,30 +378,43 @@ export async function fetchDashboardOverview() {
       FETCH FIRST 5 ROWS ONLY
     `;
 
-    const monthlyResult = await connection.execute(monthlyQuery, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
-    const topFornecedoresResult = await connection.execute(topFornecedoresQuery, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    const [monthlyResult, topFornecedoresResult] = await Promise.all([
+      connection.execute(monthlyQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT }),
+      connection.execute(topFornecedoresQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT })
+    ]);
 
-    return {
-      success: true,
-      data: {
-        activeReports,
-        totalSchedules,
-        todayAccesses,
-        monthly: monthlyResult.rows,
-        topFornecedores: topFornecedoresResult.rows
-      }
-    };
+    resultData.monthly = monthlyResult.rows;
+    resultData.topFornecedores = topFornecedoresResult.rows;
+    logToDebug("[DASHBOARD] Oracle stats loaded.");
   } catch (error: any) {
-    const timestamp = new Date().toISOString();
-    try {
-      require("fs").appendFileSync("/tmp/auth-debug.log", `[${timestamp}] [ORACLE_ERROR] ${error.message} - ${error.stack}\n`);
-    } catch (e) { }
-    console.error("Erro ao buscar dados do Dashboard via Oracle:", error);
-    return { success: false, error: "Falha na conexão DB do dashboard.", data: null };
+    logToDebug(`[DASHBOARD_ERROR] Oracle failure: ${error.message}`);
   } finally {
     if (connection) {
       try { await connection.close(); } catch (err) { }
     }
   }
+
+  // 4. Save to Cache
+  try {
+    const jsonStr = JSON.stringify(resultData);
+    await prisma.$executeRawUnsafe(`
+        INSERT INTO "DashboardCache" (id, data, "updatedAt") 
+        VALUES ('singleton', $1, NOW())
+        ON CONFLICT (id) DO UPDATE SET data = $1, "updatedAt" = NOW()
+    `, jsonStr);
+    logToDebug("[DASHBOARD] Cache updated.");
+  } catch (e: any) {
+    logToDebug(`[DASHBOARD_CACHE_SAVE_ERROR] ${e.message}`);
+  }
+
+  // Final check
+  if (resultData.monthly.length === 0 && resultData.totalSchedules === 0 && resultData.activeReports === 0) {
+    return { success: false, error: "Falha na conexão DB do dashboard.", data: null };
+  }
+
+  return {
+    success: true,
+    data: resultData
+  };
 }
 

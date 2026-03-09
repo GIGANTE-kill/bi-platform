@@ -30,7 +30,7 @@ export function SidebarNav({ onClick }: { onClick?: () => void }) {
             <div className="flex h-16 items-center border-b border-sidebar-border px-6 shrink-0">
                 <div className="flex items-center gap-2 font-bold text-xl tracking-wider text-primary">
                     <div className="h-4 w-4 rounded-full bg-primary animate-pulse shrink-0" />
-                    BI_PLATFORM
+                    Bi Relatório
                 </div>
             </div>
             <div className="flex-1 overflow-auto py-6 min-h-0">
