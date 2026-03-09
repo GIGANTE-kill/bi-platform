@@ -17,12 +17,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: bi-app
+    user: "root" # <--- LINHA ADICIONADA AQUI!
     restart: always
     ports:
       - "8089:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-bi_platform}?schema=public
-      # Oracle connection (assumed to be Thin mode using the string directly)
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_CONNECT_STRING: ${DB_CONNECT_STRING}
@@ -46,7 +46,6 @@ services:
 
 volumes:
   postgres_data:
-
 
 networks:
   Servidores:
