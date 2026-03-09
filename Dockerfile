@@ -29,7 +29,24 @@ FROM node:20-slim AS runner
 WORKDIR /app
 
 # Install production-only system dependencies
-RUN apt-get update && apt-get install -y libaio1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libaio1 \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Oracle Instant Client
+WORKDIR /opt/oracle
+RUN wget https://download.oracle.com/otn_pub/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
+    && unzip instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
+    && rm -f instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
+    && echo /opt/oracle/instantclient_21_1 > /etc/ld.so.conf.d/oracle-instantclient.conf \
+    && ldconfig
+
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_21_1
+ENV ORACLE_HOME=/opt/oracle/instantclient_21_1
+
+WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1

@@ -8,17 +8,7 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
   let connection;
 
   try {
-    // Inicializa o cliente Oracle apenas se um diretório for fornecido (necessário no Windows)
-    // e se ainda não estiver inicializado.
-    if (process.env.ORACLE_CLIENT_DIR && !(globalThis as any).isOracleInitialized) {
-      try {
-        oracledb.initOracleClient({ libDir: process.env.ORACLE_CLIENT_DIR });
-        (globalThis as any).isOracleInitialized = true;
-      } catch (initErr) {
-        console.warn("Aviso ao inicializar Oracle Client (pode já estar inicializado):", initErr);
-        (globalThis as any).isOracleInitialized = true;
-      }
-    }
+    // Oracle initialization in Docker is handled via LD_LIBRARY_PATH in the Dockerfile
 
     connection = await oracledb.getConnection({
       user: process.env.DB_USER,
@@ -148,15 +138,7 @@ export async function fetchRelatorioFinanceiro(startDate?: string, endDate?: str
   let connection;
 
   try {
-    if (process.env.ORACLE_CLIENT_DIR && !(globalThis as any).isOracleInitialized) {
-      try {
-        oracledb.initOracleClient({ libDir: process.env.ORACLE_CLIENT_DIR });
-        (globalThis as any).isOracleInitialized = true;
-      } catch (initErr) {
-        console.warn("Aviso ao inicializar Oracle Client (pode já estar inicializado):", initErr);
-        (globalThis as any).isOracleInitialized = true;
-      }
-    }
+    // Oracle initialization in Docker is handled via LD_LIBRARY_PATH
 
     connection = await oracledb.getConnection({
       user: process.env.DB_USER,
@@ -295,14 +277,7 @@ export async function fetchDashboardOverview() {
     });
 
     // ORACLE STATS
-    if (process.env.ORACLE_CLIENT_DIR && !(globalThis as any).isOracleInitialized) {
-      try {
-        oracledb.initOracleClient({ libDir: process.env.ORACLE_CLIENT_DIR });
-        (globalThis as any).isOracleInitialized = true;
-      } catch (initErr) {
-        (globalThis as any).isOracleInitialized = true;
-      }
-    }
+    // Oracle initialization in Docker is handled via LD_LIBRARY_PATH
 
     connection = await oracledb.getConnection({
       user: process.env.DB_USER,
