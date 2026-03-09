@@ -1,0 +1,2 @@
+ync(I,g)=>{try{var B=A.i(60724),Q=A.i(4991),C=A.i(23862),E=A.i(22734),D=A.i(14747),i=I([Q,C]);[Q,C]=i.then?(await i)():i;let w=D.default.join("/tmp","auth-debug.log");function o(A){E.default.appendFileSync(w,`[PRISMA_INIT] ${A}
+`)}A.g;let G=process.e
