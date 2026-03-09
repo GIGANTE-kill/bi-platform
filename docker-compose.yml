@@ -32,12 +32,11 @@ services:
       - Servidores
 
   cron:
-    image: alpine:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
     container_name: bi-cron
     restart: always
-    volumes:
-      - ./crontab:/etc/crontabs/root
-    command: crond -f -d 8
     depends_on:
       - app
     networks:
