@@ -26,8 +26,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_CONNECT_STRING: ${DB_CONNECT_STRING}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://10.122.83.135:8089}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-pSADIjasd9asd87as98d7asd8a7sd8as7d8asd}
     depends_on:
       - db
     networks:
@@ -46,6 +46,7 @@ services:
 
 volumes:
   postgres_data:
+
 
 networks:
   Servidores:
