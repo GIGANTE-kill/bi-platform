@@ -55,10 +55,12 @@ RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 nextjs
 
 # Copy only the necessary files for standalone mode
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone /app/
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static /app/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma /app/prisma
+COPY --from=builder /app/node_modules/prisma /app/node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma /app/node_modules/.bin/prisma
 
 # Expose Port
 EXPOSE 3000
