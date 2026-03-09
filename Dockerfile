@@ -37,14 +37,14 @@ RUN apt-get update && apt-get install -y \
 
 # Install Oracle Instant Client
 WORKDIR /opt/oracle
-RUN wget https://download.oracle.com/otn_pub/otn_software/linux/instantclient/211000/instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && unzip instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && rm -f instantclient-basic-linux.x64-21.1.0.0.0dbru.zip \
-    && echo /opt/oracle/instantclient_21_1 > /etc/ld.so.conf.d/oracle-instantclient.conf \
+RUN wget https://download.oracle.com/otn_software/linux/instantclient/2121000/instantclient-basic-linux.x64-21.21.0.0.0dbru.zip \
+    && unzip instantclient-basic-linux.x64-21.21.0.0.0dbru.zip \
+    && rm -f instantclient-basic-linux.x64-21.21.0.0.0dbru.zip \
+    && echo /opt/oracle/instantclient_21_21 > /etc/ld.so.conf.d/oracle-instantclient.conf \
     && ldconfig
 
-ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_21_1
-ENV ORACLE_HOME=/opt/oracle/instantclient_21_1
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_21_21
+ENV ORACLE_HOME=/opt/oracle/instantclient_21_21
 
 WORKDIR /app
 
@@ -55,12 +55,12 @@ RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 nextjs
 
 # Copy only the necessary files for standalone mode
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone /app/
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static /app/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
-COPY --from=builder --chown=nextjs:nodejs /app/prisma /app/prisma
-COPY --from=builder /app/node_modules/prisma /app/node_modules/prisma
-COPY --from=builder /app/node_modules/.bin/prisma /app/node_modules/.bin/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 # Expose Port
 EXPOSE 3000
