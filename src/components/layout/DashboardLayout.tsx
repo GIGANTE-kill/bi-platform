@@ -9,7 +9,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const loading = status === "loading";
 
     // Se não estiver logado, renderiza apenas o conteúdo (ex: tela de login) sem sidebar/header
-    if (!session && !loading) {
+    if (!session) {
         return <main className="flex-1 w-full h-screen overflow-auto">{children}</main>;
     }
 

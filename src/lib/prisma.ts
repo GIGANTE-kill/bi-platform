@@ -1,6 +1,4 @@
 import { PrismaClient } from "@/generated/prisma";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
@@ -18,11 +16,9 @@ if (!connectionString) {
 }
 
 logPrisma("Initializing Prisma Client...");
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
 
-// FORCE a new instance for now to bypass any global stale cache
-export const prisma = new PrismaClient({ adapter });
+// Removemos o PrismaPg adapter que estava causando os erros de "Invalid `prisma.user.findUnique()` invocation:"
+export const prisma = globalForPrisma.prisma || new PrismaClient();
 
 async function bootstrapAdmin() {
     try {

@@ -14,6 +14,14 @@ export default withAuth(
         if (isAuth) {
             const role = token.role;
 
+            // Se o usuário (de qualquer cargo) estiver na página de login, redireciona
+            if (pathname === "/login") {
+                if (role === "FUNCIONARIO") {
+                    return NextResponse.redirect(new URL("/pos", req.url));
+                }
+                return NextResponse.redirect(new URL("/", req.url));
+            }
+
             if (role === "FUNCIONARIO") {
                 // Rotas administrativas protegidas
                 const adminPaths = ["/builder", "/relatorio-financeiro", "/"];
@@ -21,13 +29,6 @@ export default withAuth(
                 // Se um FUNCIONÁRIO tentar acessar o root ou dashboards, redireciona para /pos
                 if (adminPaths.includes(pathname)) {
                     return NextResponse.redirect(new URL("/pos", req.url));
-                }
-            }
-
-            if (role === "GERENTE") {
-                // Se um GERENTE estiver no /login, redireciona para o root
-                if (pathname === "/login") {
-                    return NextResponse.redirect(new URL("/", req.url));
                 }
             }
         }
