@@ -19,7 +19,7 @@ export default function POSPage() {
                         Bem-vindo, {session?.user?.name || "Funcionário"}.
                     </p>
                 </div>
-                <Button variant="outline" onClick={() => signOut()} className="gap-2 border-rose-500/30 text-rose-500 hover:bg-rose-500/10">
+                <Button variant="outline" onClick={() => signOut({ callbackUrl: '/login' })} className="gap-2 border-rose-500/30 text-rose-500 hover:bg-rose-500/10">
                     <LogOut className="h-4 w-4" />
                     Sair do Sistema
                 </Button>

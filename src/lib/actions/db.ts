@@ -44,6 +44,8 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
                   JOIN PCPRODUT P ON C.CODPROD = P.CODPROD
                  WHERE C.CODFILIALPAI IN ('3', '6')
                    AND P.CODEPTO <> 6
+                   AND C.DTCARGA >= TO_DATE(:startDate, 'YYYY-MM-DD')
+                   AND C.DTCARGA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
                    ${fornecedorFilter}
                  GROUP BY C.DTCARGA, C.CODPROD, C.DESCRICAO, C.COMPRADOR, P.CODFORNEC, C.CODFILIALPAI, C.FORNECEDOR
             ),
@@ -60,7 +62,7 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
                   FROM POWERBI.AGE_FATURAMENTO
                  WHERE CODFILIAL IN ('3','6')
                    AND DATA >= TO_DATE(:startDate, 'YYYY-MM-DD')
-                   AND DATA <= TO_DATE(:endDate, 'YYYY-MM-DD')
+                   AND DATA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
                  GROUP BY CODPROD, CODFILIAL, CODSUPERVISOR, CODUSUR, CODCLI
             )
             SELECT A.DTCARGA,

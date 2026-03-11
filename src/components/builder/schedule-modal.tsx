@@ -347,7 +347,24 @@ export function ScheduleModal({
                                 </div>
                             </div>
 
-                            <div className="grid gap-2">
+                            {/* Mostrar o Período de Data Selecionado na Tela */}
+                            <div className="grid gap-2 pt-2">
+                                <label className="text-sm font-semibold flex items-center gap-1.5 text-primary">
+                                    <Clock className="h-4 w-4" /> Filtro de Período Aplicado
+                                </label>
+                                <div className="text-xs text-muted-foreground bg-background/50 border border-input rounded-md p-2">
+                                    O relatório será processado com o período: <span className="font-bold text-foreground">
+                                        {filtros?.dateMode === 'yesterday' ? 'Dia Anterior' :
+                                            filtros?.dateMode === 'last_7_days' ? 'Últimos 7 Dias' :
+                                                filtros?.dateMode === 'this_month' ? 'Este Mês' :
+                                                    filtros?.dateMode === 'last_month' ? 'Mês Passado' :
+                                                        filtros?.dateMode === 'this_quarter' ? 'Este Trimestre' :
+                                                            'Personalizado (Fixo)'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-2 pt-2">
                                 <label className="text-sm font-semibold flex items-center gap-1.5 text-primary">
                                     <Filter className="h-4 w-4" /> Filtro de Fornecedor (Opcional)
                                 </label>
@@ -377,6 +394,7 @@ export function ScheduleModal({
                                                 placeholder="Buscar fornecedor..."
                                                 value={searchFornecedor}
                                                 onChange={e => setSearchFornecedor(e.target.value)}
+                                                onKeyDown={e => e.stopPropagation()}
                                                 className="h-8 text-xs bg-background"
                                             />
                                         </div>

@@ -163,7 +163,7 @@ export default function HomePage() {
 
           <div className="h-4 w-px bg-border/50 mx-1" />
 
-          <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 gap-2 font-bold">
+          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: '/login' })} className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 gap-2 font-bold">
             <LogOut className="h-4 w-4" />
             Sair
           </Button>

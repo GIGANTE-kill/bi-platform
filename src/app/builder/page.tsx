@@ -72,9 +72,43 @@ export default function ReportBuilder() {
     });
     const [fornecedor, setFornecedor] = useState<string>("");
     const [selectedFornecedorLocal, setSelectedFornecedorLocal] = useState<string>("todos");
-    const [appliedFilters, setAppliedFilters] = useState<{ start: string, end: string, fornecedor: string }>(
-        { start: startDate, end: endDate, fornecedor: "" }
+    const [appliedFilters, setAppliedFilters] = useState<{ start: string, end: string, fornecedor: string, dateMode: string }>(
+        { start: startDate, end: endDate, fornecedor: "", dateMode: "fixed" }
     );
+    const [dateMode, setDateMode] = useState<string>("this_month");
+
+    // Dynamic date preset definitions
+    useEffect(() => {
+        if (dateMode === "fixed") return;
+
+        const now = new Date();
+        let s = new Date();
+        let e = new Date();
+
+        if (dateMode === "yesterday") {
+            s.setDate(now.getDate() - 1);
+            e = new Date(s);
+        } else if (dateMode === "last_7_days") {
+            s.setDate(now.getDate() - 7);
+            e = now;
+        } else if (dateMode === "this_month") {
+            s.setDate(1);
+            e = now;
+        } else if (dateMode === "last_month") {
+            s.setMonth(now.getMonth() - 1);
+            s.setDate(1);
+            e = new Date(s.getFullYear(), s.getMonth() + 1, 0); // last day of last month
+        } else if (dateMode === "this_quarter") {
+            const quarter = Math.floor(now.getMonth() / 3);
+            s.setMonth(quarter * 3);
+            s.setDate(1);
+            e = now;
+        }
+
+        const format = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        setStartDate(format(s));
+        setEndDate(format(e));
+    }, [dateMode]);
 
     useEffect(() => {
         async function loadData() {
@@ -109,18 +143,35 @@ export default function ReportBuilder() {
     }, [appliedFilters]);
 
     const handleApplyFilters = () => {
-        setAppliedFilters({ start: startDate, end: endDate, fornecedor });
+        setAppliedFilters({ start: startDate, end: endDate, fornecedor, dateMode });
     };
 
     const currentDatasetInfo = DATASETS_CONFIG[dataset as keyof typeof DATASETS_CONFIG];
     const activeCols = currentDatasetInfo.columns.filter((c) => selectedColumns.includes(c.id));
     const activeData = data[dataset as keyof typeof data] || [];
 
-    // Filtro Local, Fornecedor
+    // Filtro Local, Fornecedor + Texto
     const uniqueFornecedores = Array.from(new Set(activeData.map(item => item.fornecedor))).filter(Boolean).sort() as string[];
-    const filteredData = selectedFornecedorLocal !== "todos"
-        ? activeData.filter(item => item.fornecedor === selectedFornecedorLocal)
-        : activeData;
+    const filteredData = activeData.filter(item => {
+        let match = true;
+        // Filtro do Select
+        if (selectedFornecedorLocal !== "todos" && item.fornecedor !== selectedFornecedorLocal) {
+            match = false;
+        }
+        // Filtro de Texto Dinâmico (Busca Local Imediata)
+        if (fornecedor.trim() !== "") {
+            const search = fornecedor.toLowerCase();
+            const name = (item.fornecedor || "").toLowerCase();
+            const codFornec = String(item.codfornec || "");
+            const codProd = String(item.codprod || "");
+            const desc = (item.descricao || "").toLowerCase();
+
+            if (!name.includes(search) && !codFornec.includes(search) && !codProd.includes(search) && !desc.includes(search)) {
+                match = false;
+            }
+        }
+        return match;
+    });
 
     const displayData = filteredData.slice(0, 100); // 🚀 OTIMIZAÇÃO: Limite de preview no DOM
 
@@ -233,21 +284,39 @@ export default function ReportBuilder() {
                                 </Select>
                             </div>
 
-                            {/* Filtro Data */}
+                            {/* Filtro Data / Período */}
                             <div className="flex items-center gap-2 bg-background/50 px-2 py-1 h-9 rounded-md border border-input shadow-inner w-full sm:w-auto">
-                                <Input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="w-[125px] bg-transparent border-none p-0 text-sm focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
-                                />
-                                <span className="text-muted-foreground text-xs font-medium">até</span>
-                                <Input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="w-[125px] bg-transparent border-none p-0 text-sm focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
-                                />
+                                <Select value={dateMode} onValueChange={setDateMode}>
+                                    <SelectTrigger className="w-[140px] h-7 bg-transparent border-none shadow-none text-sm font-semibold text-primary px-2">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="this_month">Este Mês</SelectItem>
+                                        <SelectItem value="yesterday">Dia Anterior</SelectItem>
+                                        <SelectItem value="last_7_days">Últimos 7 Dias</SelectItem>
+                                        <SelectItem value="last_month">Mês Passado</SelectItem>
+                                        <SelectItem value="this_quarter">Este Trimestre</SelectItem>
+                                        <SelectItem value="fixed">Personalizado...</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <div className={`flex items-center gap-1 transition-opacity ${dateMode !== "fixed" ? "opacity-50 pointer-events-none" : ""}`}>
+                                    <Input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        disabled={dateMode !== "fixed"}
+                                        className="w-[115px] bg-transparent border-none p-0 text-xs focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                                    />
+                                    <span className="text-muted-foreground text-[10px] font-medium">até</span>
+                                    <Input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        disabled={dateMode !== "fixed"}
+                                        className="w-[115px] bg-transparent border-none p-0 text-xs focus-visible:ring-0 [&::-webkit-calendar-picker-indicator]:opacity-50"
+                                    />
+                                </div>
                             </div>
 
                             {/* Separator */}
@@ -336,7 +405,7 @@ export default function ReportBuilder() {
                                 Nenhuma coluna selecionada.
                             </div>
                         ) : (
-                            <div className="flex-1 w-full overflow-x-auto rounded-b-lg">
+                            <div className="flex-1 w-full overflow-auto rounded-b-lg">
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full min-w-max pb-4">
                                     <DndContext
