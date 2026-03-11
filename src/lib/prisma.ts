@@ -1,10 +1,18 @@
 import { PrismaClient } from "@/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
-const logFile = "/tmp/auth-debug.log";
+const logFile = "C:\\tmp\\auth-debug.log";
 function logPrisma(msg: string) {
-    fs.appendFileSync(logFile, `[PRISMA_INIT] ${msg}\n`);
+    const timestamp = new Date().toISOString();
+    const formattedMsg = `[${timestamp}] [PRISMA_INIT] ${msg}\n`;
+    try {
+        fs.appendFileSync(logFile, formattedMsg);
+    } catch (e) {
+        console.error("Failed to write to log file:", e);
+    }
 }
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -15,105 +23,53 @@ if (!connectionString) {
     throw new Error("DATABASE_URL is not defined in the environment variables.");
 }
 
-logPrisma("Initializing Prisma Client...");
+logPrisma("Initializing standard Prisma Client 6.4.1 with Driver Adapter...");
+console.log("[PRISMA] Initializing standard Client with pg adapter...");
 
-// Removemos o PrismaPg adapter que estava causando os erros de "Invalid `prisma.user.findUnique()` invocation:"
-export const prisma = globalForPrisma.prisma || new PrismaClient();
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+
+export const prisma = globalForPrisma.prisma || new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 async function bootstrapAdmin() {
     try {
+        console.log("[PRISMA] Starting admin bootstrap...");
         logPrisma("Bootstrapping admin user...");
+        
+        // Wait a bit to ensure DB is ready if it's still starting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         const adminEmail = "admin@admin.com";
-        // admin123 hash
-        const hashedPassword = "$2b$10$zyWU381eg6AX7oxYVA5b4OyV0rr62kGJi8.CBoB0SrIzsBkmia7a2";
+        const hashedPassword = "$2b$10$zyWU381eg6AX7oxYVA5b4OyV0rr62kGJi8.CBoB0SrIzsBkmia7a2"; // admin123
 
-        // 1. User Table
-        await prisma.$executeRaw`
-            CREATE TABLE IF NOT EXISTS "User" (
-                "id" TEXT NOT NULL,
-                "email" TEXT NOT NULL,
-                "name" TEXT,
-                "password" TEXT NOT NULL,
-                "role" TEXT NOT NULL DEFAULT 'FUNCIONARIO',
-                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP(3) NOT NULL,
-                CONSTRAINT "User_pkey" PRIMARY KEY ("id")
-            );
-        `.catch(e => logPrisma("Table User check error: " + e.message));
+        logPrisma(`Attempting to upsert admin: ${adminEmail}`);
 
-        // 2. ReportTemplate Table
-        await prisma.$executeRaw`
-            CREATE TABLE IF NOT EXISTS "ReportTemplate" (
-                "id" TEXT NOT NULL,
-                "nome" TEXT NOT NULL,
-                "dataset" TEXT NOT NULL,
-                "filtros" TEXT,
-                "selectedColumns" TEXT NOT NULL,
-                "emails" TEXT NOT NULL,
-                "frequency" TEXT NOT NULL,
-                "nextRunAt" TIMESTAMP(3),
-                "lastRunAt" TIMESTAMP(3),
-                "active" BOOLEAN NOT NULL DEFAULT true,
-                "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                "updatedAt" TIMESTAMP(3) NOT NULL,
-                CONSTRAINT "ReportTemplate_pkey" PRIMARY KEY ("id")
-            );
-        `.catch(e => logPrisma("Table ReportTemplate check error: " + e.message));
+        // Using standard Prisma methods is safer and better supported by adapters
+        const admin = await prisma.user.upsert({
+            where: { email: adminEmail },
+            update: {
+                password: hashedPassword,
+                role: 'GERENTE',
+            },
+            create: {
+                id: 'admin-fixed',
+                email: adminEmail,
+                name: 'Administrador',
+                password: hashedPassword,
+                role: 'GERENTE',
+            },
+        });
 
-        // 3. ReportLog Table
-        await prisma.$executeRaw`
-            CREATE TABLE IF NOT EXISTS "ReportLog" (
-                "id" TEXT NOT NULL,
-                "templateId" TEXT,
-                "recipient" TEXT NOT NULL,
-                "subject" TEXT NOT NULL,
-                "status" TEXT NOT NULL,
-                "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                "errorMessage" TEXT,
-                CONSTRAINT "ReportLog_pkey" PRIMARY KEY ("id"),
-                CONSTRAINT "ReportLog_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "ReportTemplate"("id") ON DELETE SET NULL
-            );
-        `.catch(e => logPrisma("Table ReportLog check error: " + e.message));
+        logPrisma(`Admin bootstrap successful. User ID: ${admin.id}`);
+        console.log("[PRISMA] Admin user bootstrapped successfully.");
 
-        // 4. DashboardCache Table
-        await prisma.$executeRaw`
-            CREATE TABLE IF NOT EXISTS "DashboardCache" (
-                "id" TEXT NOT NULL,
-                "data" TEXT NOT NULL,
-                "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                CONSTRAINT "DashboardCache_pkey" PRIMARY KEY ("id")
-            );
-        `.catch(e => logPrisma("Table DashboardCache check error: " + e.message));
-
-        await prisma.$executeRaw`
-            CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
-        `.catch(e => { });
-
-        // Use a simple query to check and insert admin
-        const users = await prisma.$queryRaw`SELECT id FROM "User" WHERE email = ${adminEmail}` as any[];
-
-        if (users.length === 0) {
-            logPrisma("Admin user not found, creating...");
-            await prisma.$executeRaw`
-                INSERT INTO "User" (id, email, name, password, role, "updatedAt")
-                VALUES ('admin-fixed', ${adminEmail}, 'Administrador', ${hashedPassword}, 'GERENTE', NOW())
-            `;
-            logPrisma("Admin user created successfully.");
-        } else {
-            logPrisma("Admin user already exists. Updating password/role to ensure access.");
-            await prisma.$executeRaw`
-                UPDATE "User" SET password = ${hashedPassword}, role = 'GERENTE', "updatedAt" = NOW() WHERE email = ${adminEmail}
-            `;
-            logPrisma("Admin user updated successfully.");
-        }
     } catch (error: any) {
         logPrisma("ERROR during bootstrap: " + error.message);
+        console.error("[PRISMA] Bootstrap ERROR:", error);
     }
 }
 
-// Trigger bootstrap (it's async but we don't block the export)
+// Run bootstrap
 bootstrapAdmin();
-
-logPrisma(`Prisma instance keys: ${Object.keys(prisma).join(", ")}`);
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

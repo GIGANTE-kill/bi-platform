@@ -24,6 +24,8 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
       endDate: endDate || defaultEndDate,
     };
 
+    console.log("Binds para Curva ABC:", binds);
+
     let fornecedorFilter = '';
     if (fornecedor) {
       binds.fornecedor = `%${fornecedor}%`;
@@ -31,30 +33,31 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
     }
 
     let query = `
-            WITH CurvaABC AS (
-                SELECT C.DTCARGA,
-                       C.CODPROD,
+            WITH CTE_BASE AS (
+                -- Pega todos os produtos que tiveram ou ABC ou Faturamento no período
+                SELECT CODPROD, CODFILIALPAI AS CODFILIAL FROM POWERBI.SR_CURVA_ABC_90D WHERE DTCARGA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND DTCARGA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
+                UNION
+                SELECT CODPROD, CODFILIAL FROM POWERBI.AGE_FATURAMENTO WHERE DATA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND DATA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
+            ),
+            CurvaABC AS (
+                SELECT C.CODPROD,
                        C.CODFILIALPAI,
-                       C.DESCRICAO,
-                       C.COMPRADOR,
-                       P.CODFORNEC,
-                       C.FORNECEDOR,
+                       MAX(C.DTCARGA) AS DTCARGA,
+                       MAX(C.DESCRICAO) AS DESCRICAO,
+                       MAX(C.COMPRADOR) AS COMPRADOR,
                        SUM(C.VLESTOQUEVENDA) AS ESTOQUE
                   FROM POWERBI.SR_CURVA_ABC_90D C
-                  JOIN PCPRODUT P ON C.CODPROD = P.CODPROD
                  WHERE C.CODFILIALPAI IN ('3', '6')
-                   AND P.CODEPTO <> 6
                    AND C.DTCARGA >= TO_DATE(:startDate, 'YYYY-MM-DD')
                    AND C.DTCARGA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
-                   ${fornecedorFilter}
-                 GROUP BY C.DTCARGA, C.CODPROD, C.DESCRICAO, C.COMPRADOR, P.CODFORNEC, C.CODFILIALPAI, C.FORNECEDOR
+                 GROUP BY C.CODPROD, C.CODFILIALPAI
             ),
             Faturamento AS (
                 SELECT CODPROD,
                        CODFILIAL,
-                       CODSUPERVISOR,
-                       CODUSUR,
-                       CODCLI,
+                       MAX(CODSUPERVISOR) AS CODSUPERVISOR,
+                       MAX(CODUSUR) AS CODUSUR,
+                       MAX(CODCLI) AS CODCLI,
                        SUM(QTD) AS QT,
                        SUM(FATURAMENTO_LIQUIDO) AS FATURAMENTO_LIQUIDO,
                        SUM(DEVOLUCAO) AS DEVOLUCAO,
@@ -63,28 +66,32 @@ export async function fetchABCData(startDate?: string, endDate?: string, fornece
                  WHERE CODFILIAL IN ('3','6')
                    AND DATA >= TO_DATE(:startDate, 'YYYY-MM-DD')
                    AND DATA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1
-                 GROUP BY CODPROD, CODFILIAL, CODSUPERVISOR, CODUSUR, CODCLI
+                 GROUP BY CODPROD, CODFILIAL
             )
-            SELECT A.DTCARGA,
-                   A.CODPROD,
-                   A.CODFILIALPAI,
-                   A.DESCRICAO,
+            SELECT NVL(A.DTCARGA, TO_DATE(:endDate, 'YYYY-MM-DD')) AS DTCARGA,
+                   B.CODPROD,
+                   B.CODFILIAL AS CODFILIALPAI,
+                   NVL(A.DESCRICAO, P.DESCRICAO) AS DESCRICAO,
                    A.COMPRADOR,
-                   A.CODFORNEC,
-                   A.FORNECEDOR,
-                   A.ESTOQUE,
-                   F.CODSUPERVISOR,
-                   F.CODUSUR,
-                   F.CODCLI,
-                   F.QT,
-                   F.FATURAMENTO_LIQUIDO,
-                   F.DEVOLUCAO,
-                   F.CUSTO_LIQUIDO
-              FROM CurvaABC A
-              LEFT JOIN Faturamento F 
-                ON A.CODPROD = F.CODPROD 
-               AND A.CODFILIALPAI = F.CODFILIAL
-             ORDER BY F.FATURAMENTO_LIQUIDO DESC NULLS LAST
+                   P.CODFORNEC,
+                   F.FORNECEDOR,
+                   NVL(A.ESTOQUE, 0) AS ESTOQUE,
+                   FAT.CODSUPERVISOR,
+                   FAT.CODUSUR,
+                   FAT.CODCLI,
+                   NVL(FAT.QT, 0) AS QT,
+                   NVL(FAT.FATURAMENTO_LIQUIDO, 0) AS FATURAMENTO_LIQUIDO,
+                   NVL(FAT.DEVOLUCAO, 0) AS DEVOLUCAO,
+                   NVL(FAT.CUSTO_LIQUIDO, 0) AS CUSTO_LIQUIDO
+              FROM CTE_BASE B
+              LEFT JOIN CurvaABC A ON B.CODPROD = A.CODPROD AND B.CODFILIAL = A.CODFILIALPAI
+              LEFT JOIN Faturamento FAT ON B.CODPROD = FAT.CODPROD AND B.CODFILIAL = FAT.CODFILIAL
+              JOIN PCPRODUT P ON B.CODPROD = P.CODPROD
+              JOIN PCFORNEC F ON P.CODFORNEC = F.CODFORNEC
+             WHERE B.CODFILIAL IN ('3', '6')
+               AND P.CODEPTO <> 6
+               ${fornecedorFilter.replace(/C\.FORNECEDOR/g, 'F.FORNECEDOR')}
+             ORDER BY FAT.FATURAMENTO_LIQUIDO DESC NULLS LAST
              FETCH FIRST 5000 ROWS ONLY
         `;
 
@@ -157,9 +164,9 @@ export async function fetchRelatorioFinanceiro(startDate?: string, endDate?: str
       binds.startDate = startDate;
       binds.endDate = endDate;
 
-      dateFilterPCMOV = `AND PCNFENT.DTENT >= TO_DATE(:startDate, 'YYYY-MM-DD') AND PCNFENT.DTENT <= TO_DATE(:endDate, 'YYYY-MM-DD')`;
-      dateFilterAGE = `AND AF.DATA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND AF.DATA <= TO_DATE(:endDate, 'YYYY-MM-DD')`;
-      dateFilterABC = `AND C.DTCARGA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND C.DTCARGA <= TO_DATE(:endDate, 'YYYY-MM-DD')`;
+      dateFilterPCMOV = `AND PCNFENT.DTENT >= TO_DATE(:startDate, 'YYYY-MM-DD') AND PCNFENT.DTENT < TO_DATE(:endDate, 'YYYY-MM-DD') + 1`;
+      dateFilterAGE = `AND AF.DATA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND AF.DATA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1`;
+      dateFilterABC = `AND C.DTCARGA >= TO_DATE(:startDate, 'YYYY-MM-DD') AND C.DTCARGA < TO_DATE(:endDate, 'YYYY-MM-DD') + 1`;
     }
 
     const query = `
@@ -294,6 +301,8 @@ export async function fetchDashboardOverview(options: { forceRefresh?: boolean }
     activeReports: 0,
     totalSchedules: 0,
     todayAccesses: 0,
+    vendasHoje: 0,
+    vendasMes: 0,
     monthly: [],
     topFornecedores: []
   };
@@ -380,13 +389,28 @@ export async function fetchDashboardOverview(options: { forceRefresh?: boolean }
       FETCH FIRST 5 ROWS ONLY
     `;
 
-    const [monthlyResult, topFornecedoresResult] = await Promise.all([
+    const realTimeStatsQuery = `
+      SELECT 
+        SUM(CASE WHEN TRUNC(DATA) = TRUNC(SYSDATE) THEN FATURAMENTO_LIQUIDO ELSE 0 END) AS VENDAS_HOJE,
+        SUM(FATURAMENTO_LIQUIDO) AS VENDAS_MES
+      FROM POWERBI.AGE_FATURAMENTO
+      WHERE DATA >= TRUNC(SYSDATE, 'MM')
+        AND CODFILIAL IN ('3', '6')
+    `;
+
+    const [monthlyResult, topFornecedoresResult, realTimeStatsResult] = await Promise.all([
       connection.execute(monthlyQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT }),
-      connection.execute(topFornecedoresQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT })
+      connection.execute(topFornecedoresQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT }),
+      connection.execute(realTimeStatsQuery, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT })
     ]);
 
     resultData.monthly = monthlyResult.rows;
     resultData.topFornecedores = topFornecedoresResult.rows;
+    if (realTimeStatsResult.rows && realTimeStatsResult.rows[0]) {
+      const row = realTimeStatsResult.rows[0] as any;
+      resultData.vendasHoje = row.VENDAS_HOJE || 0;
+      resultData.vendasMes = row.VENDAS_MES || 0;
+    }
     logToDebug("[DASHBOARD] Oracle stats loaded.");
   } catch (error: any) {
     logToDebug(`[DASHBOARD_ERROR] Oracle failure: ${error.message}`);

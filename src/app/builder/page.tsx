@@ -118,9 +118,12 @@ export default function ReportBuilder() {
                 const cached = sessionStorage.getItem(CACHE_KEY);
 
                 if (cached) {
-                    setData({ vendas: JSON.parse(cached) });
-                    setLoading(false);
-                    return;
+                    const parsed = JSON.parse(cached);
+                    if (parsed && parsed.length > 0) {
+                        setData({ vendas: parsed });
+                        setLoading(false);
+                        return;
+                    }
                 }
 
                 const result = await fetchBuilderData(appliedFilters.start, appliedFilters.end, appliedFilters.fornecedor);
@@ -246,7 +249,7 @@ export default function ReportBuilder() {
     // Observação: a exportação de PDF foi migrada para o ExportToolbar
 
     return (
-        <div className="flex flex-col flex-1 h-full gap-6 min-h-0 min-w-0 w-full relative">
+        <div className="flex flex-col flex-1 gap-6 w-full relative">
             {/* Header Area idêntico ao Relatório Financeiro */}
             <div className="flex flex-col xl:flex-row justify-between items-start gap-6 w-full">
                 <div className="flex flex-col min-w-0 xl:w-auto">
@@ -378,8 +381,8 @@ export default function ReportBuilder() {
             </div>
 
             {/* Data Preview Area */}
-            <div id="builder-report-data" className="flex flex-col gap-6 w-full print:bg-white print:text-black rounded-lg p-2 min-h-0 flex-1 overflow-hidden">
-                <Card className="flex-1 flex flex-col min-w-0 bg-linear-to-br from-background to-muted/20 backdrop-blur-xl border border-border/50 shadow-lg transition-all duration-500 hover:shadow-primary/10">
+            <div id="builder-report-data" className="flex flex-col gap-6 w-full print:bg-white print:text-black rounded-lg p-2">
+                <Card className="flex flex-col bg-linear-to-br from-background to-muted/20 backdrop-blur-xl border border-border/50 shadow-lg transition-all duration-500 hover:shadow-primary/10">
                     <CardHeader className="border-b border-border/50 pb-4 shrink-0 px-4 md:px-6 print:border-none">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
@@ -394,18 +397,18 @@ export default function ReportBuilder() {
                             )}
                         </div>
                     </CardHeader>
-                    <CardContent className="flex-1 p-0 relative min-h-0 min-w-0 flex flex-col">
+                    <CardContent className="p-0 relative flex flex-col">
                         {loading && (
-                            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-sm">
+                            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-sm min-h-[300px]">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             </div>
                         )}
                         {!loading && activeCols.length === 0 ? (
-                            <div className="flex h-full items-center justify-center p-6 text-muted-foreground text-sm">
+                            <div className="flex items-center justify-center p-6 text-muted-foreground text-sm min-h-[200px]">
                                 Nenhuma coluna selecionada.
                             </div>
                         ) : (
-                            <div className="flex-1 w-full overflow-auto rounded-b-lg">
+                            <div className="w-full overflow-x-auto rounded-b-lg">
                                 {/* Desktop Table View */}
                                 <div className="hidden md:block w-full min-w-max pb-4">
                                     <DndContext

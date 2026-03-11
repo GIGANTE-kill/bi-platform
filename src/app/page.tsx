@@ -40,6 +40,10 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+  };
+
   async function loadData(force = false) {
     if (force) setRefreshing(true);
     else setLoading(true);
@@ -70,22 +74,22 @@ export default function HomePage() {
 
   const stats = [
     {
-      label: "Relatórios Ativos",
-      value: loading ? "..." : (data?.activeReports ?? "0"),
-      icon: FileBarChart,
-      color: "text-primary"
+      label: "Faturamento Hoje",
+      value: loading ? "..." : formatCurrency(data?.vendasHoje ?? 0),
+      icon: TrendingUp,
+      color: "text-emerald-500"
     },
     {
-      label: "Modelos Salvos",
-      value: loading ? "..." : (data?.totalSchedules ?? "0"),
-      icon: CalendarClock,
+      label: "Faturamento Mês",
+      value: loading ? "..." : formatCurrency(data?.vendasMes ?? 0),
+      icon: FileBarChart,
       color: "text-chart-2"
     },
     {
-      label: "Processados Hoje",
-      value: loading ? "..." : (data?.todayAccesses ?? "0"),
-      icon: TrendingUp,
-      color: "text-sky-400"
+      label: "Relatórios Ativos",
+      value: loading ? "..." : (data?.activeReports ?? "0"),
+      icon: CalendarClock,
+      color: "text-primary"
     },
   ];
 
@@ -104,9 +108,6 @@ export default function HomePage() {
     }
   ];
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
-  };
 
   const formatDate = (dateInput: any) => {
     if (!dateInput) return "";
