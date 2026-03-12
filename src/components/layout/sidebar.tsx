@@ -62,6 +62,9 @@ export function SidebarNav({ onClick }: { onClick?: () => void }) {
                     Configurações
                 </Link>
             </div>
+            <div className="px-6 py-2 border-t border-sidebar-border/50 text-[10px] text-sidebar-foreground/30 font-mono mt-auto shrink-0 select-none">
+                BUILD: {new Date().toISOString().split('T')[0]} • v0.1.0
+            </div>
         </div>
     );
 }
